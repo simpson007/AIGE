@@ -1,0 +1,55 @@
+# 忽略不需要打包到Docker镜像的文件
+
+# Git相关
+.git
+.gitignore
+.gitattributes
+
+# IDE相关
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 测试和开发文件
+*_test.go
+test/
+tests/
+coverage.txt
+*.test
+
+# 文档
+README.md
+docs/
+*.md
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 数据库文件（使用volume挂载）
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# 日志文件
+*.log
+logs/
+
+# 环境变量文件
+.env
+.env.*
+
+# 依赖目录（构建时下载）
+vendor/
+
+# 构建产物
+aige-server
+aige
+*.exe
+*.dll
+*.so
+*.dylib

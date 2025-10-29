@@ -1,0 +1,40 @@
+# 操作系统文件
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# 项目特定忽略
+mods/.DS_Store
+backend/chat.db
+backend/AIGE
+frontend/node_modules/
+
+# 环境变量和敏感信息
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# 数据和日志
+data/
+logs/
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+# Docker
+docker-compose.override.yml
+
+# 备份文件
+*.backup
+*.bak
+*_backup_*
+
+# IDE
+.vscode/
+.idea/
+*.iml
