@@ -87,7 +87,7 @@ print_step "4. 推送到远程仓库"
 if ! git remote get-url origin &> /dev/null; then
     print_warning "未配置远程仓库"
     print_info "请先配置远程仓库:"
-    echo "  git remote add origin git@github.com:simpson007/guzhenren.git"
+    echo "  git remote add origin git@github.com:simpson007/AIGE.git"
     echo ""
     read -p "是否跳过推送步骤？(y/n) " -n 1 -r
     echo

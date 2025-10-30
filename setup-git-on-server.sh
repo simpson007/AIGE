@@ -27,7 +27,7 @@ print_step() {
 SERVER_USER="root"
 SERVER_HOST="101.43.42.250"
 SERVER_PATH="/opt/AIGE"
-GIT_REMOTE="git@github.com:simpson007/guzhenren.git"
+GIT_REMOTE="git@github.com:simpson007/AIGE.git"
 GIT_BRANCH="main"
 
 print_step "🚀 在服务器上设置 Git 仓库"
