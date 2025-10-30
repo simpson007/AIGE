@@ -47,10 +47,22 @@ func main() {
 	log.Printf("CORS 允许的域名: %v\n", allowedOrigins)
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     allowedOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowOrigins: allowedOrigins,
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Accept",
+			"Authorization",
+			"Upgrade",
+			"Connection",
+			"Sec-WebSocket-Extensions",
+			"Sec-WebSocket-Key",
+			"Sec-WebSocket-Version",
+		},
 		AllowCredentials: true,
+		ExposeHeaders:    []string{"Content-Length"},
+		MaxAge:           86400,
 	}))
 
 	// 注册路由
