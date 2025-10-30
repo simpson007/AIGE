@@ -24,6 +24,12 @@
     "game_master": "prompts/game_master.txt",
     "start_game": "prompts/start_game.txt"
   },
+  "lore_files": [
+    "蛊真人.md",
+    "其他蛊虫.md",
+    "凡蛊介绍.md",
+    "仙蛊介绍.md"
+  ],
   "initial_state": {
     "opportunities_remaining": 10,
     "daily_success_achieved": false,

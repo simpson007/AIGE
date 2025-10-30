@@ -33,6 +33,7 @@ type ModConfig struct {
 	} `json:"game_config"`
 
 	Prompts map[string]string `json:"prompts"`
+	LoreFiles []string `json:"lore_files"` // 世界观文档列表
 
 	InitialState  map[string]interface{} `json:"initial_state"`
 	WelcomeMessage string                 `json:"welcome_message"`
@@ -43,6 +44,7 @@ type GameMod struct {
 	Config    ModConfig
 	ModPath   string
 	Prompts   map[string]string // prompt name -> prompt content
+	LoreFiles map[string]string // lore file name -> lore content
 }
 
 // ModLoader handles loading and managing game mods
@@ -96,10 +98,33 @@ func (ml *ModLoader) LoadMod(modID string) (*GameMod, error) {
 		prompts[promptName] = string(content)
 	}
 
+	// Load lore files (世界观文档)
+	loreFiles := make(map[string]string)
+	for _, loreFileName := range config.LoreFiles {
+		// 先尝试从mod目录加载
+		fullPath := filepath.Join(modPath, loreFileName)
+		content, err := os.ReadFile(fullPath)
+
+		// 如果mod目录没有，尝试从项目根目录加载
+		if err != nil {
+			rootPath := filepath.Join(ml.ModsPath, "..", loreFileName)
+			content, err = os.ReadFile(rootPath)
+		}
+
+		if err != nil {
+			fmt.Printf("警告: 无法加载世界观文档 '%s': %v\n", loreFileName, err)
+			continue // 不中断加载，只是跳过这个文档
+		}
+
+		loreFiles[loreFileName] = string(content)
+		fmt.Printf("成功加载世界观文档: %s (大小: %d 字节)\n", loreFileName, len(content))
+	}
+
 	mod := &GameMod{
-		Config:  config,
-		ModPath: modPath,
-		Prompts: prompts,
+		Config:    config,
+		ModPath:   modPath,
+		Prompts:   prompts,
+		LoreFiles: loreFiles,
 	}
 
 	ml.LoadedMods[modID] = mod

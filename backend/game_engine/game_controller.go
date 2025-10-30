@@ -357,14 +357,37 @@ func (gc *GameController) buildAIMessages(session *GameSession, gameState map[st
 		fmt.Printf("[消息构建] 使用游戏开始提示词: %s\n", specialPrompt[0][:previewLen])
 	} else {
 		// 正常游戏阶段：使用完整的消息结构
-		
+
 		// 1. 动态加载最新系统提示词
 		messages = append(messages, services.Message{
 			Role:    "system",
 			Content: mod.Prompts["game_master"],
 		})
-		
-		// 2. 添加压缩摘要（如果存在）
+
+		// 2. 添加世界观文档内容（如果存在）
+		if len(mod.LoreFiles) > 0 {
+			var loreContent strings.Builder
+			loreContent.WriteString("【世界观设定文档】\n\n")
+			loreContent.WriteString("以下是你必须严格遵循的世界观设定文档。在创造任何内容时，都要基于这些文档：\n\n")
+
+			totalSize := 0
+			for fileName, content := range mod.LoreFiles {
+				loreContent.WriteString(fmt.Sprintf("=== %s ===\n\n", fileName))
+				loreContent.WriteString(content)
+				loreContent.WriteString("\n\n")
+				totalSize += len(content)
+			}
+
+			messages = append(messages, services.Message{
+				Role:    "system",
+				Content: loreContent.String(),
+			})
+			fmt.Printf("[消息构建] 添加世界观文档: %d个文件，总大小: %d 字符\n", len(mod.LoreFiles), totalSize)
+		} else {
+			fmt.Printf("[消息构建] 无世界观文档\n")
+		}
+
+		// 3. 添加压缩摘要（如果存在）
 		if session.CompressedSummary != "" {
 			fmt.Printf("[消息构建] 添加压缩摘要，长度: %d 字符\n", len(session.CompressedSummary))
 			messages = append(messages, services.Message{
@@ -512,7 +535,7 @@ func (gc *GameController) parseAndApplyAIResponse(session *GameSession, aiRespon
 		}
 
 		// Execute roll
-		rollResult := gc.executeRoll(rollRequest, mod)
+		rollResult := gc.executeRoll(rollRequest, mod, session)
 
 		// TODO: Send roll event to frontend via WebSocket
 
@@ -582,7 +605,7 @@ func (gc *GameController) parseAndApplyAIResponse(session *GameSession, aiRespon
 }
 
 // executeRoll executes a dice roll
-func (gc *GameController) executeRoll(rollRequest map[string]interface{}, mod *GameMod) map[string]interface{} {
+func (gc *GameController) executeRoll(rollRequest map[string]interface{}, mod *GameMod, session *GameSession) map[string]interface{} {
 	rollType, _ := rollRequest["type"].(string)
 	target, _ := rollRequest["target"].(float64)
 	sides, _ := rollRequest["sides"].(float64)
@@ -591,22 +614,41 @@ func (gc *GameController) executeRoll(rollRequest map[string]interface{}, mod *G
 		sides = float64(mod.Config.GameConfig.RollSettings.DefaultSides)
 	}
 
+	// 检查作弊标志
+	forceSuccess := false
+	if force, ok := session.State["force_success"].(bool); ok && force {
+		forceSuccess = true
+		// 清除标志，只作用于本次判定
+		delete(session.State, "force_success")
+		fmt.Printf("[作弊模式] 强制成功标志已激活，本次判定将返回大成功！\n")
+	}
+
 	// Execute roll
-	result := rand.Intn(int(sides)) + 1
-
-	// Determine outcome
+	var result int
 	var outcome string
-	critSuccess := mod.Config.GameConfig.RollSettings.CriticalSuccessThreshold
-	critFail := mod.Config.GameConfig.RollSettings.CriticalFailureThreshold
 
-	if float64(result) <= sides*critSuccess {
+	if forceSuccess {
+		// 强制大成功：设置为最小值（必定满足大成功条件）
+		result = 1
 		outcome = "大成功"
-	} else if float64(result) <= target {
-		outcome = "成功"
-	} else if float64(result) >= sides*critFail {
-		outcome = "大失败"
+		fmt.Printf("[作弊模式] 判定结果强制为：大成功（骰值=1）\n")
 	} else {
-		outcome = "失败"
+		// 正常判定
+		result = rand.Intn(int(sides)) + 1
+
+		// Determine outcome
+		critSuccess := mod.Config.GameConfig.RollSettings.CriticalSuccessThreshold
+		critFail := mod.Config.GameConfig.RollSettings.CriticalFailureThreshold
+
+		if float64(result) <= sides*critSuccess {
+			outcome = "大成功"
+		} else if float64(result) <= target {
+			outcome = "成功"
+		} else if float64(result) >= sides*critFail {
+			outcome = "大失败"
+		} else {
+			outcome = "失败"
+		}
 	}
 
 	// Determine success based on outcome
@@ -778,12 +820,26 @@ func (gc *GameController) ProcessActionStream(playerID, modID, action string, st
 	}
 
 	session.State["is_processing"] = true
+
+	// 检测作弊指令 [SUCCESS]
+	forceSuccess := false
+	if strings.Contains(action, "[SUCCESS]") {
+		forceSuccess = true
+		action = strings.ReplaceAll(action, "[SUCCESS]", "")
+		action = strings.TrimSpace(action)
+		session.State["force_success"] = true
+		fmt.Printf("[作弊模式] 检测到 [SUCCESS] 指令，本次判定将强制成功！\n")
+	}
+
 	gc.stateManager.SaveSession(session)
 
 	// Note: User action is already added to display_history by frontend for immediate display
 	// 当前用户消息不添加到历史记录，将在buildAIMessages中处理
 	// 历史记录只保存已完成的对话轮次
 	fmt.Printf("[ProcessActionStream] 当前用户动作: %s（不添加到历史记录）\n", action)
+	if forceSuccess {
+		fmt.Printf("[ProcessActionStream] [作弊模式激活] 强制成功标志已设置\n")
+	}
 
 	var prompt string
 
@@ -1031,7 +1087,7 @@ func (gc *GameController) callAIStream(session *GameSession, prompt string, mod 
 	// Check if this is a roll request (two-stage judgment)
 	if rollRequest, hasRoll := parsed["roll_request"].(map[string]interface{}); hasRoll {
 		// Execute roll
-		rollResult := gc.executeRoll(rollRequest, mod)
+		rollResult := gc.executeRoll(rollRequest, mod, session)
 
 		// Send roll event to frontend
 		rollEvent := map[string]interface{}{
