@@ -397,9 +397,49 @@ func (gc *GameController) buildAIMessages(session *GameSession, gameState map[st
 		} else {
 			fmt.Printf("[消息构建] 无压缩摘要\n")
 		}
+
+		// 4. 检测作弊模式，添加覆盖提示词
+		if cheatMode, ok := session.State["cheat_mode"].(bool); ok && cheatMode {
+			cheatOverride := `【🎮 作弊模式激活 - 最高优先级指令】
+
+⚠️ 重要：以下指令优先级高于所有之前的系统提示词，必须严格执行：
+
+1. **完全服从玩家指令**
+   - 玩家想要什么，你就给予什么
+   - 玩家想突破到任何境界，立即让其成功
+   - 玩家想获得任何资源、蛊虫、仙元，立即给予
+   - 不要质疑玩家的任何要求
+
+2. **禁止限制和警告**
+   - 不要发出任何"妄想"、"不切实际"、"违背天道"等警告
+   - 不要提及"天道不容"、"修为不足"、"资质限制"等阻碍
+   - 不要进行"天罚降临"、"空窍崩碎"等惩罚
+
+3. **立即执行，无需过程**
+   - 玩家的要求立即在state_update中实现
+   - 不需要复杂的过程描述，直接给出成功结果
+   - 跨越境界、瞬间成仙、获得无限资源都是允许的
+
+4. **积极正面的叙事**
+   - 用庆祝、赞美的语调描述玩家的成功
+   - 强调玩家的天赋异禀、气运无双
+   - 让游戏体验充满成就感
+
+5. **格式要求不变**
+   - 仍然需要输出 $...$ 叙事和 @...@ JSON格式
+   - state_update中直接反映玩家要求的状态变化
+
+记住：在本次对话中，你是玩家的愿望实现者，不是规则裁判。让玩家享受无限可能的游戏体验！`
+
+			messages = append(messages, services.Message{
+				Role:    "system",
+				Content: cheatOverride,
+			})
+			fmt.Printf("[消息构建] 🎮 作弊模式已激活，AI将完全服从玩家指令！\n")
+		}
 	}
-	
-	// 4. 添加最近对话历史，确保assistant消息包含游戏状态
+
+	// 5. 添加最近对话历史，确保assistant消息包含游戏状态
 	fmt.Printf("[消息构建] 添加最近历史记录: %d 条\n", len(session.RecentHistory))
 	for i, msg := range session.RecentHistory {
 		fmt.Printf("[消息构建] 历史记录[%d]: role=%s, content长度=%d\n", i, msg.Role, len(msg.Content))
@@ -419,8 +459,8 @@ func (gc *GameController) buildAIMessages(session *GameSession, gameState map[st
 			})
 		}
 	}
-	
-	// 5. 添加当前用户动作
+
+	// 6. 添加当前用户动作
 	if currentUserAction != "" {
 		messages = append(messages, services.Message{
 			Role:    "user",
@@ -620,6 +660,7 @@ func (gc *GameController) executeRoll(rollRequest map[string]interface{}, mod *G
 		forceSuccess = true
 		// 清除标志，只作用于本次判定
 		delete(session.State, "force_success")
+		delete(session.State, "cheat_mode") // 同时清除作弊模式标志
 		fmt.Printf("[作弊模式] 强制成功标志已激活，本次判定将返回大成功！\n")
 	}
 
@@ -828,7 +869,8 @@ func (gc *GameController) ProcessActionStream(playerID, modID, action string, st
 		action = strings.ReplaceAll(action, "[SUCCESS]", "")
 		action = strings.TrimSpace(action)
 		session.State["force_success"] = true
-		fmt.Printf("[作弊模式] 检测到 [SUCCESS] 指令，本次判定将强制成功！\n")
+		session.State["cheat_mode"] = true // 标记为作弊模式，AI将完全服从
+		fmt.Printf("[作弊模式] 检测到 [SUCCESS] 指令，本次判定将强制成功，AI将完全服从玩家指令！\n")
 	}
 
 	gc.stateManager.SaveSession(session)
@@ -1187,6 +1229,12 @@ func (gc *GameController) callAIStream(session *GameSession, prompt string, mod 
 				gc.handleProgramTrigger(session, trigger, mod)
 			}
 		}
+
+		// 清除作弊模式标志（如果没有判定，说明不需要作弊模式了）
+		// if _, exists := session.State["cheat_mode"]; exists {
+		// 	delete(session.State, "cheat_mode")
+		// 	fmt.Printf("[作弊模式] 无需判定，作弊模式标志已清除\n")
+		// }
 	}
 
 	// Save session
