@@ -44,11 +44,11 @@ check_docker() {
         log_info "Docker已安装: $(docker --version)"
     fi
 
-    if ! command -v docker-compose &> /dev/null; then
+    if ! command -v docker compose &> /dev/null; then
         log_error "Docker Compose未安装，正在安装..."
         install_docker_compose
     else
-        log_info "Docker Compose已安装: $(docker-compose --version)"
+        log_info "Docker Compose已安装: $(docker compose --version)"
     fi
 }
 
@@ -82,10 +82,10 @@ install_docker_compose() {
 
     # 下载最新版本的Docker Compose
     COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
-    curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
 
     # 添加执行权限
-    chmod +x /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker compose
 
     log_info "Docker Compose安装完成"
 }
@@ -117,22 +117,22 @@ start_containers() {
     log_info "构建并启动Docker容器..."
 
     # 停止旧容器
-    docker-compose down
+    docker compose down
 
     # 构建镜像
     log_info "构建Docker镜像（这可能需要几分钟）..."
-    docker-compose build --no-cache
+    docker compose build --no-cache
 
     # 启动容器
     log_info "启动容器..."
-    docker-compose up -d
+    docker compose up -d
 
     # 等待容器启动
     log_info "等待容器启动..."
     sleep 10
 
     # 检查容器状态
-    docker-compose ps
+    docker compose ps
 
     log_info "容器启动完成"
 }
@@ -159,7 +159,7 @@ check_health() {
     done
 
     log_error "容器健康检查超时，请检查日志"
-    docker-compose logs
+    docker compose logs
     exit 1
 }
 
@@ -190,16 +190,16 @@ show_deployment_info() {
     log_info "  - HTTPS: https://your-domain.com (配置域名后)"
     echo ""
     log_info "容器状态:"
-    docker-compose ps
+    docker compose ps
     echo ""
     log_info "查看日志:"
-    log_info "  docker-compose logs -f"
+    log_info "  docker compose logs -f"
     echo ""
     log_info "停止服务:"
-    log_info "  docker-compose down"
+    log_info "  docker compose down"
     echo ""
     log_info "重启服务:"
-    log_info "  docker-compose restart"
+    log_info "  docker compose restart"
     echo ""
     log_info "接下来的步骤:"
     log_info "  1. 配置Nginx反向代理（参考deploy/nginx/aige.conf）"

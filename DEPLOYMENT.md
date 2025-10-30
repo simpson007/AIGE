@@ -106,7 +106,7 @@ nano deploy.sh
 # 修改以下配置项：
 SERVER_USER="root"              # 服务器用户名
 SERVER_HOST="101.43.42.250"     # 服务器 IP 或域名
-SERVER_PATH="/root/AIGE"        # 服务器项目路径
+SERVER_PATH="/opt/AIGE"        # 服务器项目路径
 GIT_BRANCH="main"               # 部署分支
 ```
 
@@ -180,7 +180,7 @@ ssh root@101.43.42.250
 ssh root@101.43.42.250
 
 # 2. 进入项目目录
-cd /root/AIGE
+cd /opt/AIGE
 
 # 3. 运行服务器端部署脚本
 ./deploy/server-deploy.sh main
@@ -191,7 +191,7 @@ cd /root/AIGE
 ```bash
 # SSH 到服务器
 ssh root@101.43.42.250
-cd /root/AIGE
+cd /opt/AIGE
 
 # 1. 备份数据库
 cp data/chat.db data/chat.db.backup.$(date +%Y%m%d_%H%M%S)
@@ -200,16 +200,16 @@ cp data/chat.db data/chat.db.backup.$(date +%Y%m%d_%H%M%S)
 git pull origin main
 
 # 3. 停止服务
-docker-compose down
+docker compose down
 
 # 4. 重新构建
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # 5. 启动服务
-docker-compose up -d
+docker compose up -d
 
 # 6. 查看日志
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ---
@@ -219,7 +219,7 @@ docker-compose logs -f
 ### 1. 检查容器状态
 
 ```bash
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose ps'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose ps'
 ```
 
 预期输出：
@@ -290,23 +290,23 @@ git push -f origin main
 
 ```bash
 # 查看详细错误
-docker-compose build --no-cache --progress=plain
+docker compose build --no-cache --progress=plain
 
 # 清理 Docker 资源
 docker system prune -a
 
 # 重新构建
-docker-compose build --no-cache
+docker compose build --no-cache
 ```
 
 ### 问题 4：MOD 加载失败
 
 ```bash
 # 检查 MOD 目录
-ssh root@101.43.42.250 'ls -la /root/AIGE/mods'
+ssh root@101.43.42.250 'ls -la /opt/AIGE/mods'
 
 # 查看后端日志
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs backend | grep -i mod'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs backend | grep -i mod'
 
 # 检查容器内 MOD 路径
 ssh root@101.43.42.250 'docker exec aige-backend ls -la /app/mods'
@@ -322,20 +322,20 @@ ssh root@101.43.42.250 'netstat -tulpn | grep -E "8182|3000"'
 ssh root@101.43.42.250 'fuser -k 8182/tcp'
 
 # 重新启动
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose up -d'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose up -d'
 ```
 
 ### 问题 6：数据库丢失
 
 ```bash
 # 检查备份
-ssh root@101.43.42.250 'ls -lh /root/AIGE/backups/'
+ssh root@101.43.42.250 'ls -lh /opt/AIGE/backups/'
 
 # 恢复最新备份
-ssh root@101.43.42.250 'cd /root/AIGE && cp backups/chat.db.YYYYMMDD_HHMMSS data/chat.db'
+ssh root@101.43.42.250 'cd /opt/AIGE && cp backups/chat.db.YYYYMMDD_HHMMSS data/chat.db'
 
 # 重启服务
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart backend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart backend'
 ```
 
 ---
@@ -347,7 +347,7 @@ ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart backend'
 ```bash
 # 在服务器上执行
 ssh root@101.43.42.250
-cd /root/AIGE
+cd /opt/AIGE
 
 # 查看提交历史
 git log --oneline -10
@@ -370,26 +370,26 @@ git push origin main
 # 方法 2：使用 git reset（谨慎）
 git reset --hard <commit-hash>
 git push -f origin main
-ssh root@101.43.42.250 'cd /root/AIGE && git pull origin main && docker-compose up -d --build'
+ssh root@101.43.42.250 'cd /opt/AIGE && git pull origin main && docker compose up -d --build'
 ```
 
 ### 恢复数据库备份
 
 ```bash
 ssh root@101.43.42.250
-cd /root/AIGE
+cd /opt/AIGE
 
 # 查看可用备份
 ls -lh backups/
 
 # 停止服务
-docker-compose down
+docker compose down
 
 # 恢复备份
 cp backups/chat.db.20241029_140000 data/chat.db
 
 # 启动服务
-docker-compose up -d
+docker compose up -d
 ```
 
 ---
@@ -399,29 +399,29 @@ docker-compose up -d
 ### 实时查看所有日志
 
 ```bash
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs -f'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs -f'
 ```
 
 ### 只看后端日志
 
 ```bash
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs -f backend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs -f backend'
 ```
 
 ### 只看前端日志
 
 ```bash
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs -f frontend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs -f frontend'
 ```
 
 ### 查看最近的日志
 
 ```bash
 # 最近 100 行
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs --tail=100'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs --tail=100'
 
 # 最近 50 行后端日志
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs --tail=50 backend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs --tail=50 backend'
 ```
 
 ---
@@ -432,16 +432,16 @@ ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs --tail=50 backend'
 
 ```bash
 # 重启所有服务
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart'
 
 # 只重启后端
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart backend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart backend'
 ```
 
 ### 停止服务
 
 ```bash
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose down'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose down'
 ```
 
 ### 清理资源
@@ -451,17 +451,17 @@ ssh root@101.43.42.250 'cd /root/AIGE && docker-compose down'
 ssh root@101.43.42.250 'docker system prune -a'
 
 # 清理旧备份（保留最近 10 个）
-ssh root@101.43.42.250 'cd /root/AIGE/backups && ls -t chat.db.* | tail -n +11 | xargs rm'
+ssh root@101.43.42.250 'cd /opt/AIGE/backups && ls -t chat.db.* | tail -n +11 | xargs rm'
 ```
 
 ### 更新环境变量
 
 ```bash
 # 编辑 .env 文件
-ssh root@101.43.42.250 'nano /root/AIGE/.env'
+ssh root@101.43.42.250 'nano /opt/AIGE/.env'
 
 # 重新启动服务使配置生效
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart'
 ```
 
 ---
@@ -495,7 +495,7 @@ ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart'
 
 如遇到问题，请查看：
 1. 本文档的「常见问题」部分
-2. 项目日志：`docker-compose logs`
+2. 项目日志：`docker compose logs`
 3. GitHub Issues
 
 ---

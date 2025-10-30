@@ -127,19 +127,19 @@ sed -i 's/your-domain.com/example.com/g' nginx/aige.conf
 
 ```bash
 # 查看容器状态
-docker-compose ps
+docker compose ps
 
 # 查看日志
-docker-compose logs -f
+docker compose logs -f
 
 # 重启服务
-docker-compose restart
+docker compose restart
 
 # 停止服务
-docker-compose down
+docker compose down
 
 # 启动服务
-docker-compose up -d
+docker compose up -d
 ```
 
 ### 应用更新
@@ -149,10 +149,10 @@ docker-compose up -d
 git pull
 
 # 重新构建
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # 重启容器
-docker-compose down && docker-compose up -d
+docker compose down && docker compose up -d
 ```
 
 ### 数据备份
@@ -168,8 +168,8 @@ cp -r /opt/AIGE/data /opt/backups/aige_$(date +%Y%m%d)
 
 ```bash
 # 查看详细日志
-docker-compose logs backend
-docker-compose logs frontend
+docker compose logs backend
+docker compose logs frontend
 
 # 检查端口占用
 netstat -tulpn | grep -E '3000|8182'
@@ -209,7 +209,7 @@ certbot renew --dry-run
 
 如果遇到问题：
 1. 查看 [DEPLOYMENT.md](./DEPLOYMENT.md) 的故障排查章节
-2. 检查容器日志: `docker-compose logs -f`
+2. 检查容器日志: `docker compose logs -f`
 3. 提交GitHub Issue
 
 ---

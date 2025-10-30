@@ -124,7 +124,7 @@ chmod 600 .env
 
 ```bash
 docker --version
-docker-compose --version
+docker compose --version
 ```
 
 如果未安装，使用自动脚本安装：
@@ -154,8 +154,8 @@ systemctl enable docker
 
 # 安装Docker Compose
 COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
-curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
+chmod +x /usr/local/bin/docker compose
 ```
 
 ### 步骤5: 构建并启动容器
@@ -164,16 +164,16 @@ chmod +x /usr/local/bin/docker-compose
 cd /opt/AIGE
 
 # 构建Docker镜像（首次构建需要5-10分钟）
-docker-compose build
+docker compose build
 
 # 启动容器
-docker-compose up -d
+docker compose up -d
 
 # 查看容器状态
-docker-compose ps
+docker compose ps
 
 # 查看启动日志
-docker-compose logs -f
+docker compose logs -f
 ```
 
 等待所有容器状态变为 `healthy`。
@@ -263,32 +263,32 @@ curl -I https://games.yushenjian.com
 
 ```bash
 # 查看所有容器状态
-docker-compose ps
+docker compose ps
 
 # 查看实时日志
-docker-compose logs -f
+docker compose logs -f
 
 # 查看特定服务日志
-docker-compose logs -f backend
-docker-compose logs -f frontend
+docker compose logs -f backend
+docker compose logs -f frontend
 
 # 重启所有服务
-docker-compose restart
+docker compose restart
 
 # 重启特定服务
-docker-compose restart backend
+docker compose restart backend
 
 # 停止所有服务
-docker-compose stop
+docker compose stop
 
 # 启动所有服务
-docker-compose start
+docker compose start
 
 # 完全停止并删除容器
-docker-compose down
+docker compose down
 
 # 停止并删除所有数据（谨慎使用）
-docker-compose down -v
+docker compose down -v
 ```
 
 ### 应用更新
@@ -300,15 +300,15 @@ cd /opt/AIGE
 git pull
 
 # 重新构建镜像
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # 重启容器
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 
 # 查看更新后的状态
-docker-compose ps
-docker-compose logs -f
+docker compose ps
+docker compose logs -f
 ```
 
 ### 数据备份
@@ -356,21 +356,21 @@ nslookup games.yushenjian.com
 
 ### 问题2: 容器无法启动
 
-**症状**: `docker-compose ps` 显示容器Exit状态
+**症状**: `docker compose ps` 显示容器Exit状态
 
 **解决方案**:
 ```bash
 # 查看详细日志
-docker-compose logs backend
-docker-compose logs frontend
+docker compose logs backend
+docker compose logs frontend
 
 # 检查端口占用
 netstat -tulpn | grep -E '3000|8182'
 
 # 重新构建
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ### 问题3: SSL证书申请失败
@@ -401,7 +401,7 @@ systemctl start nginx
 **解决方案**:
 ```bash
 # 1. 检查容器状态
-docker-compose ps
+docker compose ps
 
 # 2. 检查Nginx状态
 systemctl status nginx
@@ -425,7 +425,7 @@ tail -f /var/log/nginx/aige-access.log
 **解决方案**:
 ```bash
 # 检查后端日志
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # 检查API密钥配置
 cat .env | grep API_KEY
@@ -520,7 +520,7 @@ echo "=== AIGE服务监控 ==="
 echo "时间: $(date)"
 echo ""
 echo "容器状态:"
-docker-compose -f /opt/AIGE/docker-compose.yml ps
+docker compose -f /opt/AIGE/docker-compose.yml ps
 echo ""
 echo "资源使用:"
 docker stats --no-stream
@@ -541,7 +541,7 @@ chmod +x /usr/local/bin/monitor-aige.sh
 
 ### 日志位置
 
-- **应用日志**: `docker-compose logs`
+- **应用日志**: `docker compose logs`
 - **Nginx日志**: `/var/log/nginx/aige-*.log`
 - **系统日志**: `/var/log/messages`
 
@@ -559,16 +559,16 @@ chmod +x /usr/local/bin/monitor-aige.sh
 cd /opt/AIGE
 
 # 查看服务状态
-docker-compose ps
+docker compose ps
 
 # 查看日志
-docker-compose logs -f
+docker compose logs -f
 
 # 重启服务
-docker-compose restart
+docker compose restart
 
 # 更新应用
-git pull && docker-compose build && docker-compose up -d
+git pull && docker compose build && docker compose up -d
 
 # 备份数据
 tar -czf backup_$(date +%Y%m%d).tar.gz data/

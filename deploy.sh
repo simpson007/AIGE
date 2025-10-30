@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 # 配置变量
 SERVER_USER="root"
 SERVER_HOST="101.43.42.250"
-SERVER_PATH="/root/AIGE"
+SERVER_PATH="/opt/AIGE"
 GIT_BRANCH="main"
 
 # 打印带颜色的消息
@@ -158,23 +158,23 @@ git log -1 --pretty=format:"%h - %an, %ar : %s"
 echo ""
 
 print_step "4. 停止现有容器"
-docker-compose down
+docker compose down
 print_success "容器已停止"
 
 print_step "5. 重新构建镜像"
 print_info "清理旧镜像并重新构建..."
-docker-compose build --no-cache
+docker compose build --no-cache
 print_success "镜像构建完成"
 
 print_step "6. 启动服务"
-docker-compose up -d
+docker compose up -d
 print_success "服务已启动"
 
 print_step "7. 等待服务启动..."
 sleep 10
 
 print_step "8. 检查容器状态"
-docker-compose ps
+docker compose ps
 
 print_step "9. 检查后端健康状态"
 for i in {1..10}; do
@@ -187,7 +187,7 @@ for i in {1..10}; do
             print_error "后端服务启动失败"
             echo ""
             print_info "查看后端日志:"
-            docker-compose logs --tail=50 backend
+            docker compose logs --tail=50 backend
             exit 1
         fi
         print_info "等待后端启动... ($i/10)"
@@ -205,7 +205,7 @@ for i in {1..5}; do
             print_error "前端服务启动失败"
             echo ""
             print_info "查看前端日志:"
-            docker-compose logs --tail=50 frontend
+            docker compose logs --tail=50 frontend
             exit 1
         fi
         print_info "等待前端启动... ($i/5)"
@@ -216,10 +216,10 @@ done
 print_step "11. 显示服务日志（最后 20 行）"
 echo ""
 print_info "【后端日志】"
-docker-compose logs --tail=20 backend
+docker compose logs --tail=20 backend
 echo ""
 print_info "【前端日志】"
-docker-compose logs --tail=20 frontend
+docker compose logs --tail=20 frontend
 
 echo ""
 print_step "✅ 部署完成！"
@@ -243,5 +243,5 @@ fi
 echo ""
 print_step "🎉 本地部署脚本执行完成"
 print_success "项目已成功部署到服务器"
-print_info "查看实时日志: ssh ${SERVER_USER}@${SERVER_HOST} 'cd ${SERVER_PATH} && docker-compose logs -f'"
+print_info "查看实时日志: ssh ${SERVER_USER}@${SERVER_HOST} 'cd ${SERVER_PATH} && docker compose logs -f'"
 echo ""

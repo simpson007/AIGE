@@ -134,13 +134,13 @@ docker --version
 ```bash
 # 下载最新版本
 COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
-curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
 
 # 添加执行权限
-chmod +x /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker compose
 
 # 验证安装
-docker-compose --version
+docker compose --version
 ```
 
 ### 步骤3: 构建和启动容器
@@ -149,16 +149,16 @@ docker-compose --version
 cd /opt/AIGE
 
 # 构建镜像
-docker-compose build
+docker compose build
 
 # 启动容器（后台运行）
-docker-compose up -d
+docker compose up -d
 
 # 查看容器状态
-docker-compose ps
+docker compose ps
 
 # 查看日志
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### 步骤4: 配置防火墙
@@ -250,26 +250,26 @@ certbot renew --dry-run
 
 ```bash
 # 查看容器状态
-docker-compose ps
+docker compose ps
 
 # 查看实时日志
-docker-compose logs -f
+docker compose logs -f
 
 # 查看特定服务日志
-docker-compose logs -f backend
-docker-compose logs -f frontend
+docker compose logs -f backend
+docker compose logs -f frontend
 
 # 重启服务
-docker-compose restart
+docker compose restart
 
 # 停止服务
-docker-compose stop
+docker compose stop
 
 # 启动服务
-docker-compose start
+docker compose start
 
 # 完全停止并删除容器
-docker-compose down
+docker compose down
 ```
 
 ### 更新应用
@@ -281,11 +281,11 @@ cd /opt/AIGE
 git pull
 
 # 重新构建镜像
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # 重启服务
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 ### 数据备份
@@ -334,11 +334,11 @@ docker system prune -a
 
 ```bash
 # 查看详细日志
-docker-compose logs backend
-docker-compose logs frontend
+docker compose logs backend
+docker compose logs frontend
 
 # 检查容器状态
-docker-compose ps
+docker compose ps
 
 # 进入容器调试
 docker exec -it aige-backend sh
@@ -445,8 +445,8 @@ systemctl restart docker
 yum update -y
 
 # 更新Docker镜像
-docker-compose pull
-docker-compose up -d
+docker compose pull
+docker compose up -d
 ```
 
 ## 📊 性能优化

@@ -17,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # 配置变量
-PROJECT_PATH="/root/AIGE"
+PROJECT_PATH="/opt/AIGE"
 GIT_BRANCH="${1:-main}"
 BACKUP_DIR="$PROJECT_PATH/backups"
 
@@ -95,9 +95,9 @@ fi
 print_success ".env 配置文件存在"
 
 print_step "5. 停止现有服务"
-if docker-compose ps | grep -q "Up"; then
+if docker compose ps | grep -q "Up"; then
     print_info "正在停止容器..."
-    docker-compose down
+    docker compose down
     print_success "容器已停止"
 else
     print_info "没有运行中的容器"
@@ -110,26 +110,26 @@ print_success "清理完成"
 
 print_step "7. 重新构建镜像"
 print_info "开始构建（无缓存）..."
-docker-compose build --no-cache
+docker compose build --no-cache
 print_success "镜像构建完成"
 
 print_step "8. 启动服务"
-docker-compose up -d
+docker compose up -d
 print_success "服务已启动"
 
 print_step "9. 等待服务启动"
 sleep 15
 
 print_step "10. 检查容器状态"
-docker-compose ps
+docker compose ps
 echo ""
 
 # 检查容器是否都在运行
-RUNNING_COUNT=$(docker-compose ps | grep "Up" | wc -l)
+RUNNING_COUNT=$(docker compose ps | grep "Up" | wc -l)
 if [ "$RUNNING_COUNT" -lt 2 ]; then
     print_error "部分容器未正常启动"
     print_info "查看日志："
-    docker-compose logs --tail=50
+    docker compose logs --tail=50
     exit 1
 fi
 
@@ -148,7 +148,7 @@ for i in {1..15}; do
         if [ $i -eq 15 ]; then
             print_error "后端服务健康检查失败"
             print_info "查看后端日志："
-            docker-compose logs --tail=100 backend
+            docker compose logs --tail=100 backend
             exit 1
         fi
         print_info "等待后端启动... ($i/15)"
@@ -165,7 +165,7 @@ for i in {1..10}; do
         if [ $i -eq 10 ]; then
             print_error "前端服务健康检查失败"
             print_info "查看前端日志："
-            docker-compose logs --tail=50 frontend
+            docker compose logs --tail=50 frontend
             exit 1
         fi
         print_info "等待前端启动... ($i/10)"
@@ -186,16 +186,16 @@ if [ "$MOD_COUNT" -gt 0 ]; then
 else
     print_error "未检测到游戏 MOD"
     print_info "查看后端日志："
-    docker-compose logs --tail=100 backend | grep -i "mod"
+    docker compose logs --tail=100 backend | grep -i "mod"
 fi
 
 print_step "14. 服务日志预览"
 echo ""
 print_info "【后端日志（最后 30 行）】"
-docker-compose logs --tail=30 backend
+docker compose logs --tail=30 backend
 echo ""
 print_info "【前端日志（最后 20 行）】"
-docker-compose logs --tail=20 frontend
+docker compose logs --tail=20 frontend
 
 print_step "✅ 部署完成"
 echo ""
@@ -207,10 +207,10 @@ echo "  • 后端地址: http://localhost:8182"
 echo "  • 健康检查: http://localhost:8182/health"
 echo ""
 print_info "常用命令："
-echo "  • 查看日志: docker-compose logs -f"
-echo "  • 重启服务: docker-compose restart"
-echo "  • 停止服务: docker-compose down"
-echo "  • 查看状态: docker-compose ps"
+echo "  • 查看日志: docker compose logs -f"
+echo "  • 重启服务: docker compose restart"
+echo "  • 停止服务: docker compose down"
+echo "  • 查看状态: docker compose ps"
 echo ""
 print_info "备份位置: $BACKUP_DIR"
 echo ""

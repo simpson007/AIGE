@@ -43,40 +43,40 @@ nano deploy.sh
 ### 查看状态
 ```bash
 # 查看容器状态
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose ps'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose ps'
 
 # 查看日志（实时）
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs -f'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs -f'
 
 # 只看后端日志
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs -f backend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs -f backend'
 
 # 查看最近 100 行日志
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs --tail=100'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs --tail=100'
 ```
 
 ### 重启服务
 ```bash
 # 重启所有服务
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart'
 
 # 只重启后端
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart backend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart backend'
 
 # 只重启前端
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart frontend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart frontend'
 ```
 
 ### 停止/启动服务
 ```bash
 # 停止
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose down'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose down'
 
 # 启动
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose up -d'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose up -d'
 
 # 重新构建并启动
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose up -d --build'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose up -d --build'
 ```
 
 ---
@@ -104,22 +104,22 @@ curl http://101.43.42.250:3000
 ./deploy.sh
 
 # 手动备份
-ssh root@101.43.42.250 'cp /root/AIGE/data/chat.db /root/AIGE/backups/chat.db.$(date +%Y%m%d_%H%M%S)'
+ssh root@101.43.42.250 'cp /opt/AIGE/data/chat.db /opt/AIGE/backups/chat.db.$(date +%Y%m%d_%H%M%S)'
 ```
 
 ### 恢复
 ```bash
 # 1. 查看备份
-ssh root@101.43.42.250 'ls -lh /root/AIGE/backups/'
+ssh root@101.43.42.250 'ls -lh /opt/AIGE/backups/'
 
 # 2. 停止服务
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose down'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose down'
 
 # 3. 恢复备份（替换 YYYYMMDD_HHMMSS 为实际时间）
-ssh root@101.43.42.250 'cp /root/AIGE/backups/chat.db.YYYYMMDD_HHMMSS /root/AIGE/data/chat.db'
+ssh root@101.43.42.250 'cp /opt/AIGE/backups/chat.db.YYYYMMDD_HHMMSS /opt/AIGE/data/chat.db'
 
 # 4. 启动服务
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose up -d'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose up -d'
 ```
 
 ---
@@ -128,13 +128,13 @@ ssh root@101.43.42.250 'cd /root/AIGE && docker-compose up -d'
 
 ```bash
 # 1. 查看提交历史
-ssh root@101.43.42.250 'cd /root/AIGE && git log --oneline -10'
+ssh root@101.43.42.250 'cd /opt/AIGE && git log --oneline -10'
 
 # 2. 回滚到指定版本
-ssh root@101.43.42.250 'cd /root/AIGE && git reset --hard <commit-hash>'
+ssh root@101.43.42.250 'cd /opt/AIGE && git reset --hard <commit-hash>'
 
 # 3. 重新部署
-ssh root@101.43.42.250 'cd /root/AIGE && ./deploy/server-deploy.sh main'
+ssh root@101.43.42.250 'cd /opt/AIGE && ./deploy/server-deploy.sh main'
 ```
 
 ---
@@ -144,13 +144,13 @@ ssh root@101.43.42.250 'cd /root/AIGE && ./deploy/server-deploy.sh main'
 ### MOD 加载失败
 ```bash
 # 检查 MOD 目录
-ssh root@101.43.42.250 'ls -la /root/AIGE/mods'
+ssh root@101.43.42.250 'ls -la /opt/AIGE/mods'
 
 # 检查容器内 MOD
 ssh root@101.43.42.250 'docker exec aige-backend ls -la /app/mods'
 
 # 查看后端日志中的 MOD 信息
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose logs backend | grep -i mod'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose logs backend | grep -i mod'
 ```
 
 ### 端口被占用
@@ -169,7 +169,7 @@ ssh root@101.43.42.250 'fuser -k 3000/tcp'
 ssh root@101.43.42.250 'docker system prune -a'
 
 # 重新构建（无缓存）
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose build --no-cache'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose build --no-cache'
 
 # 查看容器详细信息
 ssh root@101.43.42.250 'docker inspect aige-backend'
@@ -178,10 +178,10 @@ ssh root@101.43.42.250 'docker inspect aige-backend'
 ### 数据库锁定
 ```bash
 # 重启后端服务
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart backend'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart backend'
 
 # 如果还是不行，停止所有服务
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose down && docker-compose up -d'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose down && docker compose up -d'
 ```
 
 ---
@@ -208,11 +208,11 @@ ssh root@101.43.42.250 'docker system df'
 
 ```bash
 # 更新环境变量
-ssh root@101.43.42.250 'nano /root/AIGE/.env'
-ssh root@101.43.42.250 'cd /root/AIGE && docker-compose restart'
+ssh root@101.43.42.250 'nano /opt/AIGE/.env'
+ssh root@101.43.42.250 'cd /opt/AIGE && docker compose restart'
 
 # 清理旧备份（保留最近 10 个）
-ssh root@101.43.42.250 'cd /root/AIGE/backups && ls -t chat.db.* | tail -n +11 | xargs rm'
+ssh root@101.43.42.250 'cd /opt/AIGE/backups && ls -t chat.db.* | tail -n +11 | xargs rm'
 
 # 更新系统
 ssh root@101.43.42.250 'apt update && apt upgrade -y'
@@ -245,29 +245,29 @@ AIGE/
 ### 服务完全无法访问
 ```bash
 ssh root@101.43.42.250
-cd /root/AIGE
-docker-compose down
-docker-compose up -d
-docker-compose logs -f
+cd /opt/AIGE
+docker compose down
+docker compose up -d
+docker compose logs -f
 ```
 
 ### 紧急回滚
 ```bash
 ssh root@101.43.42.250
-cd /root/AIGE
+cd /opt/AIGE
 git reset --hard HEAD~1
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### 完全重新部署
 ```bash
 ssh root@101.43.42.250
-cd /root/AIGE
-docker-compose down
+cd /opt/AIGE
+docker compose down
 docker system prune -a -f
 git pull origin main
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ---
