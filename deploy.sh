@@ -137,7 +137,16 @@ if [ ! -d ".git" ]; then
     exit 1
 fi
 
-print_step "1. 备份数据库"
+print_step "1. 确保数据目录存在"
+if [ ! -d "data" ]; then
+    mkdir -p data
+    chmod 755 data
+    print_success "已创建 data 目录"
+else
+    print_info "data 目录已存在"
+fi
+
+print_step "2. 备份数据库"
 if [ -f "data/chat.db" ]; then
     BACKUP_FILE="data/chat.db.backup.$(date +%Y%m%d_%H%M%S)"
     cp data/chat.db "$BACKUP_FILE"
@@ -146,37 +155,37 @@ else
     print_info "未找到数据库文件，跳过备份"
 fi
 
-print_step "2. 拉取最新代码"
+print_step "3. 拉取最新代码"
 print_info "切换到分支: BRANCH_PLACEHOLDER"
 git fetch origin
 git checkout BRANCH_PLACEHOLDER
 git pull origin BRANCH_PLACEHOLDER
 print_success "代码拉取成功"
 
-print_step "3. 显示最新提交"
+print_step "4. 显示最新提交"
 git log -1 --pretty=format:"%h - %an, %ar : %s"
 echo ""
 
-print_step "4. 停止现有容器"
+print_step "5. 停止现有容器"
 docker compose down
 print_success "容器已停止"
 
-print_step "5. 重新构建镜像"
+print_step "6. 重新构建镜像"
 print_info "清理旧镜像并重新构建..."
 docker compose build --no-cache
 print_success "镜像构建完成"
 
-print_step "6. 启动服务"
+print_step "7. 启动服务"
 docker compose up -d
 print_success "服务已启动"
 
-print_step "7. 等待服务启动..."
+print_step "8. 等待服务启动..."
 sleep 10
 
-print_step "8. 检查容器状态"
+print_step "9. 检查容器状态"
 docker compose ps
 
-print_step "9. 检查后端健康状态"
+print_step "10. 检查后端健康状态"
 for i in {1..10}; do
     if curl -f -s http://localhost:8182/health > /dev/null; then
         print_success "后端服务健康检查通过"
@@ -195,7 +204,7 @@ for i in {1..10}; do
     fi
 done
 
-print_step "10. 检查前端健康状态"
+print_step "11. 检查前端健康状态"
 for i in {1..5}; do
     if curl -f -s http://localhost:3000 > /dev/null; then
         print_success "前端服务健康检查通过"
@@ -213,7 +222,7 @@ for i in {1..5}; do
     fi
 done
 
-print_step "11. 显示服务日志（最后 20 行）"
+print_step "12. 显示服务日志（最后 20 行）"
 echo ""
 print_info "【后端日志】"
 docker compose logs --tail=20 backend
