@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"path/filepath"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -23,6 +24,13 @@ func InitDB() {
 	}
 
 	log.Printf("使用数据库路径: %s\n", dbPath)
+
+	// 确保数据库文件的父目录存在
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		log.Fatal("创建数据库目录失败:", err)
+	}
+	log.Printf("数据库目录已就绪: %s\n", dbDir)
 
 	var err error
 	DB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
