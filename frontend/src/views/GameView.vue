@@ -39,13 +39,13 @@
             <span class="opportunities">
               剩余机缘: <strong>{{ sessionState?.opportunities_remaining ?? 10 }}</strong>
             </span>
-            <button @click="saveGame" class="btn-save" :disabled="isSaving">
+            <!-- <button @click="saveGame" class="btn-save" :disabled="isSaving">
               {{ isSaving ? '存档中...' : '💾 手动存档' }}
-            </button>
+            </button> -->
             <button @click="showRestartConfirm" class="btn-restart" title="清空所有存档，重新开始">
               🔄 重启机缘
             </button>
-            <button @click="switchGame" class="btn-secondary">切换游戏</button>
+            <!-- <button @click="switchGame" class="btn-secondary">切换游戏</button> -->
             <button @click="logout" class="btn-danger">退出</button>
           </div>
           <!-- 移动端菜单按钮 -->
@@ -66,15 +66,15 @@
       <!-- 移动端菜单 -->
       <div v-if="showMobileMenu" class="mobile-menu-overlay" @click="closeMobileMenu">
         <div class="mobile-menu" @click.stop>
-          <button @click="handleMobileSave" :disabled="isSaving">
+          <!-- <button @click="handleMobileSave" :disabled="isSaving">
             {{ isSaving ? '存档中...' : '💾 手动存档' }}
-          </button>
+          </button> -->
           <button @click="handleMobileRestart">
             🔄 重启机缘
           </button>
-          <button @click="handleMobileSwitchGame">
+          <!-- <button @click="handleMobileSwitchGame">
             🎮 切换游戏
-          </button>
+          </button> -->
           <button @click="handleMobileLogout">
             🚪 退出
           </button>
@@ -251,6 +251,8 @@ const currentModInfo = ref<any>(null)
 const gameState = ref<any>(null)
 const displayHistory = computed(() => gameState.value?.display_history || [])
 
+console.log(displayHistory, 'displayHistory')
+
 // 辅助computed属性，便于访问嵌套的state
 const sessionState = computed(() => gameState.value?.state || gameState.value || {})
 
@@ -302,6 +304,69 @@ const wsReady = ref(false) // 追踪WebSocket连接状态
 const shouldReconnect = ref(true) // 控制是否应该重连
 const narrativeWindow = ref<HTMLElement>()
 
+function buildDisplayHistoryFromRecent(recentHistory: any[]): string[] {
+  const displayHistory: string[] = []
+  
+  recentHistory.forEach((msg: { role: string; content: string; timestamp: string }) => {
+    const { role, content } = msg
+    
+    if (role === 'user') {
+      let userText = ''
+      if (content === 'start_trial') {
+        userText = '> 开始试炼'
+      } else {
+        userText = `> ${content}`
+      }
+      displayHistory.push(userText)
+    } else if (role === 'assistant') {
+      let narrative = ''
+      
+      // 优先尝试解析为JSON（处理纯JSON格式）
+      try {
+        let jsonContent = content
+        // 如果以 \n\n{ 开头，移除前缀
+        if (jsonContent.startsWith('\n\n{')) {
+          jsonContent = jsonContent.slice(2)  // 移除 \n\n，留下 {
+        }
+        
+        const parsed = JSON.parse(jsonContent)
+        narrative = parsed.narrative || ''
+        // 替换 JSON 中的双转义 \\n 为 \n
+        narrative = narrative.replace(/\\n/g, '\n').trim()
+        
+        if (narrative) {
+          displayHistory.push(narrative)
+          return  // 成功，跳出循环迭代
+        }
+      } catch (error) {
+        // 不是JSON，继续原有逻辑
+      }
+      
+      // 原有提取：匹配 $...$ 或 split @\n{
+      const dollarMatch = content.match(/\$\s*(.*?)\s*\$/s)
+      if (dollarMatch && dollarMatch[1]) {
+        narrative = dollarMatch[1]
+      } else {
+        const parts = content.split('@\n{', 1)
+        if (parts.length > 0) {
+          narrative = parts[0].trim()
+        } else {
+          narrative = content // 极端fallback
+        }
+      }
+      
+      // 替换可能的 \\n 为 \n
+      narrative = narrative.replace(/\\n/g, '\n').trim()
+      
+      if (narrative) {
+        displayHistory.push(narrative)
+      }
+    }
+  })
+  
+  return displayHistory
+}
+
 // 获取可用的游戏mod列表
 async function loadAvailableMods() {
   try {
@@ -350,19 +415,33 @@ async function initializeGame() {
     if (response.ok) {
       loadingText.value = '正在加载游戏数据...'
       const data = await response.json()
-      //console.log('[GameView] 初始化响应:', data)
       gameState.value = data.state || data
-      //console.log('[GameView] gameState设置为:', gameState.value)
+      
+      // 新增：从 recent_history 重建 display_history（如果存在）
+      const recentHistory = data.recent_history || gameState.value?.recent_history || []
+      if (recentHistory.length > 0) {
+        // 如果 display_history 为空或初始，使用重建的
+        if (!gameState.value.display_history || gameState.value.display_history.length === 0) {
+          gameState.value.display_history = buildDisplayHistoryFromRecent(recentHistory)
+        } else {
+          // 可选：合并或追加，如果后端 display_history 不完整
+          gameState.value.display_history = [
+            ...gameState.value.display_history,
+            ...buildDisplayHistoryFromRecent(recentHistory)
+          ]
+        }
+      }
+      
+      // console.log 为调试
+      console.log('[GameView] 重建后的 display_history:', gameState.value.display_history)
+      
       loadingText.value = '正在建立实时连接...'
       connectWebSocket()
     } else {
-      const error = await response.text()
-      console.error('[GameView] 初始化失败:', error)
-      ElMessage.error('初始化游戏失败: ' + error)
+      // ... 错误处理 ...
     }
   } catch (error) {
-    console.error('初始化游戏失败:', error)
-    ElMessage.error('网络错误')
+    // ... 错误处理 ...
   } finally {
     isLoading.value = false
   }
@@ -917,6 +996,120 @@ function getBlockClass(text: string): string {
   return 'narrative-message'
 }
 
+// 翻译描述文本
+function translateDescription(text: string): string {
+  // 常见英文描述的中文翻译映射
+  const translations: Record<string, string> = {
+    // 基础属性描述
+    'Increases cultivation speed': '提升修炼速度',
+    'Improves spiritual root quality': '改善灵根品质',
+    'Enhances comprehension ability': '增强悟性',
+    'Boosts physical strength': '增强体质',
+    'Increases lifespan': '增加寿命',
+    'Improves luck': '提升气运',
+    'Enhances spiritual perception': '增强灵性感知',
+    'Strengthens meridians': '强化经脉',
+
+    // 功法效果描述
+    'Basic cultivation technique': '基础修炼功法',
+    'Advanced cultivation method': '高级修炼法门',
+    'Sword cultivation art': '剑修功法',
+    'Alchemy refinement technique': '炼丹术',
+    'Array formation mastery': '阵法精通',
+    'Spirit beast taming': '灵兽驯养',
+
+    // 物品类型描述
+    'Medicine pill': '丹药',
+    'Spirit stone': '灵石',
+    'Magic weapon': '法宝',
+    'Cultivation resource': '修炼资源',
+    'Defensive artifact': '防御法器',
+    'Offensive weapon': '攻击性武器',
+    'Auxiliary tool': '辅助工具',
+
+    // 状态效果描述
+    'Temporary buff': '临时增益效果',
+    'Permanent enhancement': '永久增强',
+    'Debuff effect': '负面状态',
+    'Passive ability': '被动能力',
+    'Active skill': '主动技能',
+
+    // 宗门相关描述
+    'Sect identity token': '宗门身份令牌',
+    'Position within sect': '宗门内职位',
+    'Sect contribution points': '宗门贡献点',
+    'Access to sect resources': '宗门资源访问权限',
+
+    // 境界相关描述
+    'Breakthrough assistance': '突破辅助',
+    'Realm stability enhancement': '境界稳固增强',
+    'Foundation strengthening': '根基强化',
+
+    // 杂项描述
+    'Rare material': '稀有材料',
+    'Common item': '普通物品',
+    'Legendary artifact': '传奇法宝',
+    'Ancient relic': '古代遗物',
+    'Mysterious item': '神秘物品',
+
+    // 时间相关
+    'Short duration': '短时间持续',
+    'Long duration': '长时间持续',
+    'Permanent effect': '永久效果',
+    'Instant effect': '即时效果',
+
+    // 数值相关
+    'Minor enhancement': '小幅提升',
+    'Major enhancement': '大幅提升',
+    'Slight improvement': '轻微改善',
+    'Significant improvement': '显著改善'
+  }
+
+  // 如果有直接匹配的翻译，返回翻译
+  if (translations[text]) {
+    return translations[text]
+  }
+
+  // 尝试部分匹配和智能翻译
+  const lowerText = text.toLowerCase()
+
+  // 检查是否包含某些关键词
+  if (lowerText.includes('cultivation')) {
+    if (lowerText.includes('speed')) return '提升修炼速度'
+    if (lowerText.includes('efficiency')) return '提升修炼效率'
+    if (lowerText.includes('comprehension')) return '增强修炼感悟'
+  }
+
+  if (lowerText.includes('spiritual')) {
+    if (lowerText.includes('root')) return '灵根相关'
+    if (lowerText.includes('energy')) return '灵力相关'
+    if (lowerText.includes('perception')) return '灵性感知'
+  }
+
+  if (lowerText.includes('strength')) {
+    return '力量增强'
+  }
+
+  if (lowerText.includes('defense')) {
+    return '防御提升'
+  }
+
+  if (lowerText.includes('attack')) {
+    return '攻击增强'
+  }
+
+  if (lowerText.includes('luck') || lowerText.includes('fortune')) {
+    return '运气加成'
+  }
+
+  if (lowerText.includes('lifespan') || lowerText.includes('longevity')) {
+    return '寿命增加'
+  }
+
+  // 如果没有找到匹配，返回原文本（可以在这里添加更多翻译规则）
+  return text
+}
+
 // 格式化键名 - 通用实现，根据内容类型自动选择图标
 function formatKey(key: string): string {
   // 通用规则：根据 key 的语义自动选择合适的图标
@@ -979,7 +1172,8 @@ function formatValue(value: any): string {
         return `<div class="array-item">• ${item}</div>`
       } else if (typeof item === 'object' && item !== null) {
         if (item.名称 && item.数量) {
-          return `<div class="item-entry">• ${item.名称} × ${item.数量}${item.说明 ? `<br><span class="item-desc">${item.说明}</span>` : ''}</div>`
+          const description = item.说明 ? translateDescription(item.说明) : ''
+          return `<div class="item-entry">• ${item.名称} × ${item.数量}${description ? `<br><span class="item-desc">${description}</span>` : ''}</div>`
         } else {
           return `<div class="array-item">• ${formatObjectInline(item)}</div>`
         }
@@ -998,11 +1192,11 @@ function formatValue(value: any): string {
         html += '<div class="goal-section goal-life">'
         html += '<div class="goal-section-title">🌟 人生目标</div>'
         html += '<div class="goal-section-content">'
-        if (value.人生目标.描述) html += `<div class="goal-field"><span class="field-label">描述：</span>${value.人生目标.描述}</div>`
-        if (value.人生目标.核心动机) html += `<div class="goal-field"><span class="field-label">核心动机：</span>${value.人生目标.核心动机}</div>`
-        if (value.人生目标.最终愿景) html += `<div class="goal-field"><span class="field-label">最终愿景：</span>${value.人生目标.最终愿景}</div>`
+        if (value.人生目标.描述) html += `<div class="goal-field"><span class="field-label">描述：</span>${translateDescription(value.人生目标.描述)}</div>`
+        if (value.人生目标.核心动机) html += `<div class="goal-field"><span class="field-label">核心动机：</span>${translateDescription(value.人生目标.核心动机)}</div>`
+        if (value.人生目标.最终愿景) html += `<div class="goal-field"><span class="field-label">最终愿景：</span>${translateDescription(value.人生目标.最终愿景)}</div>`
         if (value.人生目标.宿命纠葛 && Array.isArray(value.人生目标.宿命纠葛) && value.人生目标.宿命纠葛.length > 0) {
-          html += `<div class="goal-field"><span class="field-label">宿命纠葛：</span><div class="field-list">${value.人生目标.宿命纠葛.map((item: string) => `<div class="list-item">• ${item}</div>`).join('')}</div></div>`
+          html += `<div class="goal-field"><span class="field-label">宿命纠葛：</span><div class="field-list">${value.人生目标.宿命纠葛.map((item: string) => `<div class="list-item">• ${translateDescription(item)}</div>`).join('')}</div></div>`
         }
         html += '</div></div>'
       }
@@ -1012,10 +1206,10 @@ function formatValue(value: any): string {
         html += '<div class="goal-section goal-immediate">'
         html += '<div class="goal-section-title">⚡ 立即目标</div>'
         html += '<div class="goal-section-content">'
-        if (value.立即目标.描述) html += `<div class="goal-field"><span class="field-label">描述：</span>${value.立即目标.描述}</div>`
+        if (value.立即目标.描述) html += `<div class="goal-field"><span class="field-label">描述：</span>${translateDescription(value.立即目标.描述)}</div>`
         if (value.立即目标.紧迫程度) html += `<div class="goal-field"><span class="field-label">紧迫程度：</span><span class="urgency-badge urgency-${value.立即目标.紧迫程度}">${value.立即目标.紧迫程度}</span></div>`
-        if (value.立即目标.完成条件) html += `<div class="goal-field"><span class="field-label">完成条件：</span>${value.立即目标.完成条件}</div>`
-        if (value.立即目标.奖励预期) html += `<div class="goal-field"><span class="field-label">奖励预期：</span>${value.立即目标.奖励预期}</div>`
+        if (value.立即目标.完成条件) html += `<div class="goal-field"><span class="field-label">完成条件：</span>${translateDescription(value.立即目标.完成条件)}</div>`
+        if (value.立即目标.奖励预期) html += `<div class="goal-field"><span class="field-label">奖励预期：</span>${translateDescription(value.立即目标.奖励预期)}</div>`
         html += '</div></div>'
       }
       
@@ -1024,12 +1218,12 @@ function formatValue(value: any): string {
         html += '<div class="goal-section goal-stage">'
         html += '<div class="goal-section-title">📈 阶段目标</div>'
         html += '<div class="goal-section-content">'
-        if (value.阶段目标.描述) html += `<div class="goal-field"><span class="field-label">描述：</span>${value.阶段目标.描述}</div>`
+        if (value.阶段目标.描述) html += `<div class="goal-field"><span class="field-label">描述：</span>${translateDescription(value.阶段目标.描述)}</div>`
         if (value.阶段目标.关键节点 && Array.isArray(value.阶段目标.关键节点) && value.阶段目标.关键节点.length > 0) {
-          html += `<div class="goal-field"><span class="field-label">关键节点：</span><div class="field-list">${value.阶段目标.关键节点.map((item: string) => `<div class="list-item">• ${item}</div>`).join('')}</div></div>`
+          html += `<div class="goal-field"><span class="field-label">关键节点：</span><div class="field-list">${value.阶段目标.关键节点.map((item: string) => `<div class="list-item">• ${translateDescription(item)}</div>`).join('')}</div></div>`
         }
-        if (value.阶段目标.障碍分析) html += `<div class="goal-field"><span class="field-label">障碍分析：</span>${value.阶段目标.障碍分析}</div>`
-        if (value.阶段目标.解决路径) html += `<div class="goal-field"><span class="field-label">解决路径：</span>${value.阶段目标.解决路径}</div>`
+        if (value.阶段目标.障碍分析) html += `<div class="goal-field"><span class="field-label">障碍分析：</span>${translateDescription(value.阶段目标.障碍分析)}</div>`
+        if (value.阶段目标.解决路径) html += `<div class="goal-field"><span class="field-label">解决路径：</span>${translateDescription(value.阶段目标.解决路径)}</div>`
         html += '</div></div>'
       }
       
@@ -1154,16 +1348,20 @@ function formatArrayValue(arr: any[], depth: number = 0): string {
 function formatObjectInline(obj: any): string {
   const entries = Object.entries(obj)
   if (entries.length === 0) return '<span class="empty-value">无</span>'
-  
+
   let html = '<div class="inline-object">'
-  
+
   entries.forEach(([key, value]) => {
     if (value === null || value === undefined || value === '') return
-    
+
     html += '<div class="inline-item">'
     html += `<span class="inline-key">${key}:</span> `
-    
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+
+    if (typeof value === 'string') {
+      // 如果是说明或描述字段，尝试翻译
+      const translatedValue = (key === '说明' || key === 'description') ? translateDescription(value) : value
+      html += `<span class="inline-value">${translatedValue}</span>`
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
       html += `<span class="inline-value">${value}</span>`
     } else if (Array.isArray(value)) {
       html += `<span class="inline-value">[${value.length}项]</span>`
@@ -1172,10 +1370,10 @@ function formatObjectInline(obj: any): string {
     } else {
       html += `<span class="inline-value">${value}</span>`
     }
-    
+
     html += '</div>'
   })
-  
+
   html += '</div>'
   return html
 }
