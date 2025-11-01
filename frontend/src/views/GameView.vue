@@ -114,17 +114,17 @@
           
           <!-- PC端输入区域 -->
           <div class="pc-input-area">
-            <button 
-              v-if="!sessionState?.is_in_trial && !sessionState?.daily_success_achieved" 
+            <button
+              v-if="!sessionState?.is_in_trial && !isGameReallyEnded"
               @click="startTrial"
               :disabled="!wsReady || isProcessing || isRolling || (sessionState?.opportunities_remaining ?? 0) <= 0"
               class="btn-start"
             >
               {{ getStartButtonText() }}
             </button>
-            
+
             <div v-else-if="sessionState?.is_in_trial" class="action-input-row">
-              <input 
+              <input
                 v-model="userInput"
                 type="text"
                 placeholder="汝欲何为..."
@@ -132,7 +132,7 @@
                 :disabled="isProcessing || isRolling"
                 class="action-input"
               />
-              <button 
+              <button
                 @click="sendAction"
                 :disabled="isProcessing || isRolling || !userInput.trim()"
                 class="btn-primary"
@@ -140,9 +140,18 @@
                 {{ isProcessing ? '处理中...' : isRolling ? '判定中...' : '行动' }}
               </button>
             </div>
-            
-            <div v-else-if="sessionState?.daily_success_achieved" class="success-message">
+
+            <div v-else-if="isGameReallyEnded" class="success-message">
               <p>🎉 今日功德圆满！明日再来。</p>
+            </div>
+
+            <!-- 临时修复：如果误判为结束但实际可以继续 -->
+            <div v-else-if="sessionState?.daily_success_achieved && !isGameReallyEnded" class="warning-message">
+              <p>⚠️ 检测到游戏状态异常（可能是误判）</p>
+              <button @click="forceContinueGame" class="btn-warning">
+                强制继续游戏
+              </button>
+              <p class="small-text">剩余机缘: {{ sessionState?.opportunities_remaining ?? 0 }}</p>
             </div>
           </div>
         </main>
@@ -152,8 +161,8 @@
       <div class="mobile-input-area">
         <!-- 输入区域 -->
         <div class="input-area">
-            <button 
-              v-if="!sessionState?.is_in_trial && !sessionState?.daily_success_achieved" 
+            <button
+              v-if="!sessionState?.is_in_trial && !isGameReallyEnded"
               @click="startTrial"
               :disabled="!wsReady || isProcessing || isRolling || (sessionState?.opportunities_remaining ?? 0) <= 0"
               class="btn-start"
@@ -162,7 +171,7 @@
             </button>
 
             <div v-else-if="sessionState?.is_in_trial" class="action-input-row">
-              <input 
+              <input
                 v-model="userInput"
                 type="text"
                 placeholder="汝欲何为..."
@@ -170,7 +179,7 @@
                 :disabled="isProcessing || isRolling"
                 class="action-input"
               />
-              <button 
+              <button
                 @click="sendAction"
                 :disabled="isProcessing || isRolling || !userInput.trim()"
                 class="btn-primary"
@@ -179,8 +188,17 @@
               </button>
             </div>
 
-            <div v-else-if="sessionState?.daily_success_achieved" class="success-message">
+            <div v-else-if="isGameReallyEnded" class="success-message">
               <p>🎉 今日功德圆满！明日再来。</p>
+            </div>
+
+            <!-- 临时修复：如果误判为结束但实际可以继续 -->
+            <div v-else-if="sessionState?.daily_success_achieved && !isGameReallyEnded" class="warning-message">
+              <p>⚠️ 检测到游戏状态异常</p>
+              <button @click="forceContinueGame" class="btn-warning">
+                强制继续游戏
+              </button>
+              <p class="small-text">剩余机缘: {{ sessionState?.opportunities_remaining ?? 0 }}</p>
             </div>
         </div>
       </div>
@@ -255,6 +273,29 @@ console.log(displayHistory, 'displayHistory')
 
 // 辅助computed属性，便于访问嵌套的state
 const sessionState = computed(() => gameState.value?.state || gameState.value || {})
+
+// 增加更严格的游戏结束判断
+const isGameReallyEnded = computed(() => {
+  // 只有当明确设置了 daily_success_achieved 为 true 才认为游戏结束
+  // 并且需要有明确的结局标记或机缘次数用尽
+  const dailySuccess = sessionState.value?.daily_success_achieved === true
+  const hasExplicitEnding = sessionState.value?.ending_type !== undefined
+  const noOpportunities = (sessionState.value?.opportunities_remaining ?? 10) <= 0
+
+  // 调试日志
+  if (dailySuccess) {
+    console.log('[GameView] 检测到daily_success_achieved，详细状态:', {
+      daily_success_achieved: dailySuccess,
+      ending_type: sessionState.value?.ending_type,
+      opportunities_remaining: sessionState.value?.opportunities_remaining,
+      is_in_trial: sessionState.value?.is_in_trial,
+      current_life: sessionState.value?.current_life
+    })
+  }
+
+  // 只有明确的结局或机缘用尽才算真正结束
+  return dailySuccess && (hasExplicitEnding || noOpportunities)
+})
 
 // 过滤current_life中的空值属性 - 仅支持新数据结构
 const filteredCurrentLife = computed(() => {
@@ -693,6 +734,24 @@ function showRollEvent(event: any) {
     showRollAnimation.value = false
     rollEvent.value = null
   }, 3500)
+}
+
+// 强制继续游戏（绕过误判的结束状态）
+function forceContinueGame() {
+  console.log('[GameView] 强制继续游戏，清除误判的结束状态')
+
+  // 清除错误的结束标记
+  if (gameState.value && gameState.value.state) {
+    gameState.value.state.daily_success_achieved = false
+    // 如果 is_in_trial 被错误设为 false，恢复它
+    if (!gameState.value.state.is_in_trial && (gameState.value.state.opportunities_remaining ?? 0) > 0) {
+      gameState.value.state.is_in_trial = false // 保持false，让用户可以重新开始
+    }
+  } else if (gameState.value) {
+    gameState.value.daily_success_achieved = false
+  }
+
+  ElMessage.warning('已清除误判的结束状态，你可以继续游戏了')
 }
 
 // 开始试炼
@@ -1934,6 +1993,48 @@ onUnmounted(() => {
   color: #28a745;
   font-size: 1.1rem;
   font-weight: 500;
+}
+
+/* 警告消息样式 */
+.warning-message {
+  text-align: center;
+  padding: 1rem;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  margin: 0 auto;
+  max-width: 400px;
+}
+
+.warning-message p {
+  color: #856404;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.warning-message .small-text {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+.btn-warning {
+  padding: 0.75rem 1.5rem;
+  background: #ffc107;
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+}
+
+.btn-warning:hover {
+  background: #ffb300;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(255, 193, 7, 0.4);
 }
 
 .narrative-block {
