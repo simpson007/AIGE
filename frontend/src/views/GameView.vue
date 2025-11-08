@@ -127,10 +127,10 @@
               <input
                 v-model="userInput"
                 type="text"
-                placeholder="汝欲何为..."
+                :placeholder="cheatMode ? '汝欲何为... (作弊模式已启用)' : '汝欲何为...'"
                 @keydown.enter="sendAction"
                 :disabled="isProcessing || isRolling"
-                class="action-input"
+                :class="['action-input', { 'cheat-active': cheatMode }]"
               />
               <button
                 @click="sendAction"
@@ -138,6 +138,13 @@
                 class="btn-primary"
               >
                 {{ isProcessing ? '处理中...' : isRolling ? '判定中...' : '行动' }}
+              </button>
+              <button
+                @click="toggleCheatMode"
+                :class="['btn-cheat', { active: cheatMode }]"
+                title="开启/关闭作弊模式"
+              >
+                {{ cheatMode ? '🔓' : '🔒' }}
               </button>
             </div>
 
@@ -174,10 +181,10 @@
               <input
                 v-model="userInput"
                 type="text"
-                placeholder="汝欲何为..."
+                :placeholder="cheatMode ? '汝欲何为... (作弊模式已启用)' : '汝欲何为...'"
                 @keydown.enter="sendAction"
                 :disabled="isProcessing || isRolling"
-                class="action-input"
+                :class="['action-input', { 'cheat-active': cheatMode }]"
               />
               <button
                 @click="sendAction"
@@ -185,6 +192,13 @@
                 class="btn-primary"
               >
                 {{ isProcessing ? '处理中...' : isRolling ? '判定中...' : '行动' }}
+              </button>
+              <button
+                @click="toggleCheatMode"
+                :class="['btn-cheat', { active: cheatMode }]"
+                title="开启/关闭作弊模式"
+              >
+                {{ cheatMode ? '🔓' : '🔒' }}
               </button>
             </div>
 
@@ -327,6 +341,9 @@ const filteredCurrentLife = computed(() => {
   return Object.keys(filtered).length > 0 ? filtered : null
 })
 const userInput = ref('')
+
+// 作弊模式状态
+const cheatMode = ref(false) // 是否启用作弊模式
 
 // 移动端状态管理
 const showStatusPanel = ref(false)
@@ -789,28 +806,42 @@ async function startTrial() {
 // 发送行动
 function sendAction() {
   if (!userInput.value.trim()) return
-  
+
   if (ws && ws.readyState === WebSocket.OPEN) {
-    const action = userInput.value.trim()
-    
+    let action = userInput.value.trim()
+
+    // 如果启用了作弊模式，自动添加 [SUCCESS] 前缀
+    if (cheatMode.value) {
+      action = `[SUCCESS] ${action}`
+    }
+
     // 立即设置为处理状态，禁用输入
     if (gameState.value && gameState.value.state) {
       gameState.value.state.is_processing = true
     }
-    
-    // 立即显示用户消息到对话框
+
+    // 立即显示用户消息到对话框（显示原始输入，不显示[SUCCESS]）
     if (gameState.value && gameState.value.display_history) {
       gameState.value.display_history = [
         ...gameState.value.display_history,
-        `> ${action}`
+        `> ${userInput.value.trim()}`
       ]
       nextTick(() => scrollToBottom())
     }
-    
+
     // 发送消息到后端
     ws.send(JSON.stringify({ action: action }))
     userInput.value = ''
   }
+}
+
+// 切换作弊模式
+function toggleCheatMode() {
+  cheatMode.value = !cheatMode.value
+  ElMessage({
+    message: cheatMode.value ? '作弊模式已开启 🎮' : '作弊模式已关闭',
+    type: cheatMode.value ? 'warning' : 'info'
+  })
 }
 
 // 手动保存游戏
@@ -1938,6 +1969,18 @@ onUnmounted(() => {
   color: #999;
 }
 
+/* 作弊模式激活时的输入框样式 */
+.action-input.cheat-active {
+  border-color: #ffc107;
+  background: #fffbf0;
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.15);
+}
+
+.action-input.cheat-active:focus {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3);
+}
+
 .btn-start {
   padding: 1rem 2rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1986,6 +2029,48 @@ onUnmounted(() => {
   background: #ccc;
   cursor: not-allowed;
   transform: none;
+}
+
+/* 作弊模式按钮样式 */
+.btn-cheat {
+  padding: 0.75rem 1rem;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 50px;
+}
+
+.btn-cheat:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+.btn-cheat.active {
+  background: #ffc107;
+  color: #333;
+  animation: pulse 1.5s infinite;
+}
+
+.btn-cheat.active:hover {
+  background: #e0a800;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+  }
 }
 
 .success-message {
