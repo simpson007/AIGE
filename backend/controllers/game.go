@@ -172,6 +172,15 @@ func GameWebSocket(c *gin.Context) {
 			continue
 		}
 
+		// 提取自定义属性（如果有）
+		var customAttributes map[string]interface{}
+		if attrs, exists := message["custom_attributes"]; exists {
+			if attrsMap, ok := attrs.(map[string]interface{}); ok {
+				customAttributes = attrsMap
+				fmt.Printf("接收到自定义属性: %+v\n", customAttributes)
+			}
+		}
+
 		// 流式回调函数
 		streamCallback := func(chunk string) error {
 			// 检查是否是判定结果
@@ -198,7 +207,7 @@ func GameWebSocket(c *gin.Context) {
 		}
 
 		// 处理不同的动作 - 统一使用流式处理
-		err = gameController.ProcessActionStream(playerID, modID, action, streamCallback, rollCallback, secondStageCallback)
+		err = gameController.ProcessActionStreamWithAttributes(playerID, modID, action, customAttributes, streamCallback, rollCallback, secondStageCallback)
 
 		if err != nil {
 			sendError(conn, err.Error())

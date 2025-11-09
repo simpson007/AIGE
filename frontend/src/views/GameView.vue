@@ -264,6 +264,94 @@
       </div>
     </div>
   </div>
+
+  <!-- 角色创建对话框 -->
+  <el-dialog
+    v-model="showCharacterCreation"
+    title="创建角色"
+    width="600px"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
+    <el-form :model="characterForm" label-width="100px" label-position="right">
+      <el-form-item label="姓名">
+        <el-input
+          v-model="characterForm.name"
+          placeholder="请输入2-4个中文字符"
+          maxlength="4"
+        />
+      </el-form-item>
+
+      <el-form-item label="性别">
+        <el-radio-group v-model="characterForm.gender">
+          <el-radio label="男">男</el-radio>
+          <el-radio label="女">女</el-radio>
+        </el-radio-group>
+      </el-form-item>
+
+      <el-form-item label="资质">
+        <el-select v-model="characterForm.qualification" placeholder="请选择资质">
+          <el-option label="丁等资质 (20-30% 元海)" value="丁等资质">
+            <span>丁等资质</span>
+            <span style="color: #999; font-size: 12px; margin-left: 8px;">最高二转</span>
+          </el-option>
+          <el-option label="丙等资质 (40-50% 元海)" value="丙等资质">
+            <span>丙等资质</span>
+            <span style="color: #999; font-size: 12px; margin-left: 8px;">通常二转，偶三转</span>
+          </el-option>
+          <el-option label="乙等资质 (60-70% 元海)" value="乙等资质">
+            <span>乙等资质</span>
+            <span style="color: #999; font-size: 12px; margin-left: 8px;">可达三至四转</span>
+          </el-option>
+          <el-option label="甲等资质 (80-90% 元海)" value="甲等资质">
+            <span>甲等资质</span>
+            <span style="color: #999; font-size: 12px; margin-left: 8px;">可达五转</span>
+          </el-option>
+          <el-option label="十绝体 (100% 元海)" value="十绝体">
+            <span>十绝体</span>
+            <span style="color: #f56c6c; font-size: 12px; margin-left: 8px;">可自爆，极度危险</span>
+          </el-option>
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="初始修为">
+        <el-select v-model="characterForm.cultivation" placeholder="请选择初始修为">
+          <el-option label="一转初阶" value="一转初阶" />
+          <el-option label="一转中阶" value="一转中阶" />
+          <el-option label="一转高阶" value="一转高阶" />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="初始元石">
+        <el-slider
+          v-model="characterForm.spiritStones"
+          :min="10"
+          :max="100"
+          :step="10"
+          show-input
+        />
+      </el-form-item>
+
+      <el-form-item label="出身背景">
+        <el-input
+          v-model="characterForm.background"
+          type="textarea"
+          :rows="3"
+          placeholder="（可选）描述角色的出身背景，留空则由AI随机生成"
+          maxlength="150"
+          show-word-limit
+        />
+      </el-form-item>
+    </el-form>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="useRandomCharacter">随机生成</el-button>
+        <el-button type="primary" @click="confirmCharacterCreation">确定创建</el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -341,6 +429,17 @@ const filteredCurrentLife = computed(() => {
   return Object.keys(filtered).length > 0 ? filtered : null
 })
 const userInput = ref('')
+
+// 角色创建相关状态
+const showCharacterCreation = ref(false)
+const characterForm = ref({
+  name: '',
+  gender: '男',
+  qualification: '丙等资质',
+  cultivation: '一转初阶',
+  spiritStones: 50,
+  background: ''
+})
 
 // 作弊模式状态
 const cheatMode = ref(false) // 是否启用作弊模式
@@ -773,20 +872,56 @@ function forceContinueGame() {
 
 // 开始试炼
 async function startTrial() {
-  //console.log('[GameView] startTrial 被调用，发送start_trial消息')
-  
+  //console.log('[GameView] startTrial 被调用，显示角色创建对话框')
+
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     // 理论上不应该到这里，因为按钮已经disabled
     console.error('[GameView] WebSocket未连接')
     ElMessage.error('连接未就绪，请稍候重试')
     return
   }
-  
+
+  // 显示角色创建对话框
+  showCharacterCreation.value = true
+}
+
+// 使用随机生成角色
+function useRandomCharacter() {
+  // 清空表单，使用AI随机生成
+  characterForm.value = {
+    name: '',
+    gender: '',
+    qualification: '',
+    cultivation: '',
+    spiritStones: 0,
+    background: ''
+  }
+  confirmCharacterCreation()
+}
+
+// 确认角色创建
+async function confirmCharacterCreation() {
+  // 验证必填字段（仅在自定义模式下）
+  if (characterForm.value.name) {
+    if (!characterForm.value.name || characterForm.value.name.length < 2 || characterForm.value.name.length > 4) {
+      ElMessage.error('姓名需要2-4个字符')
+      return
+    }
+    // 背景字段是可选的，如果填写了就要有内容
+    if (characterForm.value.background && characterForm.value.background.length > 0 && characterForm.value.background.length < 20) {
+      ElMessage.error('背景故事至少需要20个字符')
+      return
+    }
+  }
+
+  // 关闭对话框
+  showCharacterCreation.value = false
+
   // 立即设置为处理状态，禁用按钮
   if (gameState.value && gameState.value.state) {
     gameState.value.state.is_processing = true
   }
-  
+
   // 立即显示开始试炼的消息
   if (gameState.value && gameState.value.display_history) {
     gameState.value.display_history = [
@@ -795,12 +930,65 @@ async function startTrial() {
     ]
     nextTick(() => scrollToBottom())
   }
-  
+
   // 只在开始试炼时显示短暂加载，AI开始响应后立即隐藏
   isLoading.value = true
   loadingText.value = '正在开启试炼...'
-  
-  ws.send(JSON.stringify({ action: 'start_trial' }))
+
+  // 构造消息，包含自定义属性
+  const message: any = { action: 'start_trial' }
+
+  // 检查是否有任何自定义属性（不是所有字段都是默认值）
+  const hasCustomAttributes =
+    characterForm.value.name !== '' ||
+    characterForm.value.gender !== '男' ||
+    characterForm.value.qualification !== '丙等资质' ||
+    characterForm.value.cultivation !== '一转初阶' ||
+    characterForm.value.spiritStones !== 50 ||
+    characterForm.value.background !== ''
+
+  // 如果有任何自定义属性，添加到消息中
+  if (hasCustomAttributes) {
+    const customAttrs: any = {}
+
+    // 只添加非空/非默认值的字段
+    if (characterForm.value.name) {
+      customAttrs.姓名 = characterForm.value.name
+    }
+    if (characterForm.value.gender && characterForm.value.gender !== '') {
+      customAttrs.性别 = characterForm.value.gender
+    }
+    if (characterForm.value.qualification && characterForm.value.qualification !== '') {
+      customAttrs.资质 = characterForm.value.qualification
+    }
+    if (characterForm.value.cultivation && characterForm.value.cultivation !== '') {
+      customAttrs.修为 = characterForm.value.cultivation
+    }
+    if (characterForm.value.spiritStones > 0) {
+      customAttrs.元石 = characterForm.value.spiritStones
+    }
+    if (characterForm.value.background) {
+      customAttrs.出身 = characterForm.value.background
+    }
+
+    // 只有当确实有自定义内容时才添加
+    if (Object.keys(customAttrs).length > 0) {
+      message.custom_attributes = customAttrs
+      console.log('发送自定义属性:', customAttrs)
+    }
+  }
+
+  ws.send(JSON.stringify(message))
+
+  // 重置表单
+  characterForm.value = {
+    name: '',
+    gender: '男',
+    qualification: '丙等资质',
+    cultivation: '一转初阶',
+    spiritStones: 50,
+    background: ''
+  }
 }
 
 // 发送行动
@@ -2713,22 +2901,35 @@ onUnmounted(() => {
   
   .input-area {
     margin: 0;
+    overflow: visible; /* 确保内容不被截断 */
   }
   
   .action-input-row {
+    display: flex;
     gap: 0.75rem;
+    align-items: center;
+    width: 100%;
   }
   
   .action-input {
     font-size: 16px; /* 防止iOS缩放 */
     padding: 0.75rem;
+    flex: 1; /* 让输入框占据剩余空间 */
   }
-  
+
   .btn-primary, .btn-start {
     min-height: 48px;
     padding: 0.75rem 1.5rem;
     font-size: 1rem;
     white-space: nowrap;
+  }
+
+  /* 移动端作弊按钮样式 */
+  .btn-cheat {
+    min-height: 48px;
+    min-width: 48px;
+    padding: 0.75rem;
+    font-size: 1.2rem;
   }
   
   /* 移动端状态面板抽屉 */
@@ -2904,6 +3105,14 @@ onUnmounted(() => {
   .btn-primary, .btn-start {
     min-height: 44px;
     font-size: 0.9rem;
+  }
+
+  /* 小屏幕作弊按钮 */
+  .btn-cheat {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 1rem;
+    padding: 0.5rem;
   }
   
   .mobile-menu {

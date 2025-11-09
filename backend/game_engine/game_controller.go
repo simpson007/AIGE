@@ -843,6 +843,167 @@ type StreamCallback func(chunk string) error
 // RollEventCallback 判定事件回调函数类型
 type RollEventCallback func(rollEvent map[string]interface{}) error
 
+// ProcessActionStreamWithAttributes processes a player action with custom attributes and streaming narrative
+func (gc *GameController) ProcessActionStreamWithAttributes(playerID, modID, action string, customAttributes map[string]interface{}, streamCallback StreamCallback, rollCallback RollEventCallback, secondStageCallback StreamCallback) error {
+	session, err := gc.stateManager.GetSession(playerID, modID)
+	if err != nil {
+		return err
+	}
+
+	mod, err := gc.modLoader.GetMod(modID)
+	if err != nil {
+		return err
+	}
+
+	// Check if already processing
+	if isProcessing, ok := session.State["is_processing"].(bool); ok && isProcessing {
+		return fmt.Errorf("已有操作正在处理中")
+	}
+
+	session.State["is_processing"] = true
+
+	// 检测作弊指令 [SUCCESS]
+	forceSuccess := false
+	if strings.Contains(action, "[SUCCESS]") {
+		forceSuccess = true
+		action = strings.ReplaceAll(action, "[SUCCESS]", "")
+		action = strings.TrimSpace(action)
+		session.State["force_success"] = true
+		session.State["cheat_mode"] = true // 标记为作弊模式，AI将完全服从
+		fmt.Printf("[作弊模式] 检测到 [SUCCESS] 指令，本次判定将强制成功，AI将完全服从玩家指令！\n")
+	}
+
+	gc.stateManager.SaveSession(session)
+
+	// Note: User action is already added to display_history by frontend for immediate display
+	// 当前用户消息不添加到历史记录，将在buildAIMessages中处理
+	// 历史记录只保存已完成的对话轮次
+	fmt.Printf("[ProcessActionStreamWithAttributes] 当前用户动作: %s（不添加到历史记录）\n", action)
+	if forceSuccess {
+		fmt.Printf("[ProcessActionStreamWithAttributes] [作弊模式激活] 强制成功标志已设置\n")
+	}
+
+	var prompt string
+
+	// Handle special actions
+	if action == "start_trial" {
+		// Use start trial prompt
+		startPrompt := mod.Prompts["start_trial"]
+		if startPrompt == "" {
+			startPrompt = mod.Prompts["start_game"]
+		}
+
+		// 如果有自定义属性，添加到prompt中
+		if customAttributes != nil && len(customAttributes) > 0 {
+			attrStr := "\n\n🔴【极其重要：用户自定义角色属性】🔴\n"
+			attrStr += "⚠️ 以下是用户明确要求的角色设定，你必须100%严格遵守，不可更改任何一个字：\n\n"
+			hasCustomAttrs := false
+
+			if name, ok := customAttributes["姓名"].(string); ok && name != "" {
+				attrStr += fmt.Sprintf("✅ 姓名：%s（必须使用此姓名，不可更改）\n", name)
+				hasCustomAttrs = true
+			}
+			if gender, ok := customAttributes["性别"].(string); ok && gender != "" {
+				attrStr += fmt.Sprintf("✅ 性别：%s（必须是%s，不可更改）\n", gender, gender)
+				hasCustomAttrs = true
+			}
+			if qualification, ok := customAttributes["资质"].(string); ok && qualification != "" {
+				attrStr += fmt.Sprintf("✅ 资质：%s（必须是此资质等级）\n", qualification)
+				hasCustomAttrs = true
+			}
+			if cultivation, ok := customAttributes["修为"].(string); ok && cultivation != "" {
+				attrStr += fmt.Sprintf("✅ 修为：%s（必须是此修为境界）\n", cultivation)
+				hasCustomAttrs = true
+			}
+			if spiritStones, ok := customAttributes["元石"].(float64); ok && spiritStones > 0 {
+				attrStr += fmt.Sprintf("✅ 元石：%d枚（必须是此数量）\n", int(spiritStones))
+				hasCustomAttrs = true
+			}
+			if background, ok := customAttributes["出身"].(string); ok && background != "" {
+				attrStr += fmt.Sprintf("✅ 出身背景：%s（必须基于此背景展开故事）\n", background)
+				hasCustomAttrs = true
+			}
+
+			if hasCustomAttrs {
+				attrStr += "\n🔴【生成规则】🔴\n"
+				attrStr += "1. ⚠️ 以上打✅的属性是用户的明确要求，必须100%使用，一字不改\n"
+				attrStr += "2. 📝 未提及的属性（如蛊虫、关系网、道痕等）需要你根据已定义属性合理生成\n"
+				attrStr += "3. 🎭 如果用户没有定义出身背景，请创造一个符合其他属性的精彩背景故事\n"
+				attrStr += "4. 🔗 确保所有生成的内容与用户定义的属性保持逻辑一致性\n"
+				attrStr += "5. ❌ 绝对禁止改变任何用户已定义的属性值！\n\n"
+				attrStr += "记住：用户的自定义属性拥有最高优先级，必须覆盖任何默认设定！\n"
+
+				prompt = startPrompt + attrStr
+				fmt.Printf("添加自定义属性到prompt: %s\n", attrStr)
+			} else {
+				// 用户选择了随机生成
+				prompt = startPrompt + "\n\n【完全随机生成】\n用户没有提供任何自定义属性，请为玩家创造一个独特的角色，包括姓名、性别、资质、修为、元石、出身背景等所有属性。"
+			}
+		} else {
+			prompt = startPrompt
+		}
+	} else {
+		// 对于普通动作，不需要额外的prompt
+		// 用户消息已经在RecentHistory中，游戏状态会在buildAIMessages中作为系统消息添加
+		prompt = ""
+	}
+
+	// Call AI with streaming (with retry mechanism)
+	maxRetries := 3
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		fmt.Printf("[一阶段重试] 尝试第 %d/%d 次调用AI\n", attempt, maxRetries)
+
+		err = gc.callAIStream(session, prompt, mod, action, streamCallback, rollCallback, secondStageCallback)
+		if err == nil {
+			fmt.Printf("[一阶段重试] 第 %d 次调用成功\n", attempt)
+			break
+		}
+
+		lastErr = err
+		fmt.Printf("[一阶段重试] 第 %d 次调用失败: %v\n", attempt, err)
+
+		// 检查是否是JSON格式错误
+		if strings.Contains(err.Error(), "no valid JSON found") ||
+			strings.Contains(err.Error(), "failed to parse") {
+			fmt.Printf("[一阶段重试] 检测到JSON格式错误，准备重试...\n")
+
+			if attempt < maxRetries {
+				// 在重试前稍等一下，避免请求过于频繁
+				// time.Sleep(time.Millisecond * 500)
+
+				// 修改prompt，要求AI更加注意格式
+				if action == "start_new_trial" {
+					// 新游戏开始，使用特殊提示
+					currentStateJSON, _ := json.Marshal(session.State)
+					prompt = fmt.Sprintf("%s\n\n⚠️ 重要格式要求：\n1. 必须严格按照JSON格式输出\n2. 确保JSON语法正确，特别注意引号和逗号\n3. 所有字符串值都要用双引号包围\n4. 叙事内容在JSON的narrative字段中\n\n当前游戏状态：\n%s", mod.Prompts["start_game"], string(currentStateJSON))
+				} else {
+					// 常规动作，添加格式提醒
+					currentStateJSON, _ := json.Marshal(session.State)
+					prompt = fmt.Sprintf("%s\n\n⚠️ 重要格式要求：\n1. 必须严格按照JSON格式输出\n2. 确保JSON语法正确，特别注意引号和逗号\n3. 所有字符串值都要用双引号包围\n4. 叙事内容在JSON的narrative字段中\n\n当前游戏状态：\n%s", action, string(currentStateJSON))
+				}
+			}
+		} else {
+			// 非格式错误，不重试
+			fmt.Printf("[一阶段重试] 非格式错误，不进行重试: %v\n", err)
+			break
+		}
+	}
+
+	if err != nil {
+		fmt.Printf("[一阶段重试] 所有重试均失败，最后错误: %v\n", lastErr)
+		session.State["is_processing"] = false
+		gc.stateManager.SaveSession(session)
+		return fmt.Errorf("first stage AI call failed after %d attempts: %w", maxRetries, lastErr)
+	}
+
+	session.State["is_processing"] = false
+	gc.stateManager.SaveSession(session)
+
+	return err
+}
+
 // ProcessActionStream processes a player action with streaming narrative
 func (gc *GameController) ProcessActionStream(playerID, modID, action string, streamCallback StreamCallback, rollCallback RollEventCallback, secondStageCallback StreamCallback) error {
 	session, err := gc.stateManager.GetSession(playerID, modID)
