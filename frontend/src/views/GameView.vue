@@ -978,7 +978,15 @@ async function confirmCharacterCreation() {
     }
   }
 
-  ws.send(JSON.stringify(message))
+  // 发送消息到WebSocket
+  if (ws && wsReady.value) {
+    ws.send(JSON.stringify(message))
+  } else {
+    console.error('WebSocket not connected')
+    ElMessage.error('连接未就绪，请稍后再试')
+    isLoading.value = false
+    return
+  }
 
   // 重置表单
   characterForm.value = {
@@ -1018,7 +1026,17 @@ function sendAction() {
     }
 
     // 发送消息到后端
-    ws.send(JSON.stringify({ action: action }))
+    if (ws && wsReady.value) {
+      ws.send(JSON.stringify({ action: action }))
+    } else {
+      console.error('WebSocket not connected')
+      ElMessage.error('连接未就绪，请稍后再试')
+      // 恢复状态
+      if (gameState.value && gameState.value.state) {
+        gameState.value.state.is_processing = false
+      }
+      return
+    }
     userInput.value = ''
   }
 }
