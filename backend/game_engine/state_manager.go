@@ -21,7 +21,10 @@ type GameSession struct {
 	CompressionRound int                    `json:"compression_round"`  // 压缩轮次
 	DisplayHistory   []string               `json:"display_history"`  // User-facing narrative
 	LastModified     time.Time              `json:"last_modified"`
-	
+
+	// 实体管理
+	EntityRegistry   string                 `json:"entity_registry,omitempty"` // 序列化的实体注册表
+
 	// 预留社交功能字段
 	Social *SocialData `json:"social,omitempty"` // 社交数据（预留）
 }
@@ -64,24 +67,26 @@ type Message struct {
 
 // StateManager handles game session storage and retrieval
 type StateManager struct {
-	mu          sync.RWMutex
-	sessions    map[string]map[string]*GameSession // playerID -> modID -> session
-	autoSave    bool
-	saveInterval time.Duration
+	mu            sync.RWMutex
+	sessions      map[string]map[string]*GameSession // playerID -> modID -> session
+	autoSave      bool
+	saveInterval  time.Duration
+	entityManager *EntityManager // 新增：实体管理器
 }
 
 // NewStateManager creates a new state manager
 func NewStateManager(autoSave bool, saveInterval time.Duration) *StateManager {
 	sm := &StateManager{
-		sessions:     make(map[string]map[string]*GameSession),
-		autoSave:     autoSave,
-		saveInterval: saveInterval,
+		sessions:      make(map[string]map[string]*GameSession),
+		autoSave:      autoSave,
+		saveInterval:  saveInterval,
+		entityManager: NewEntityManager(), // 初始化实体管理器
 	}
-	
+
 	if autoSave {
 		go sm.autoSaveLoop()
 	}
-	
+
 	return sm
 }
 
@@ -264,29 +269,37 @@ func (sm *StateManager) loadFromDB(playerID, modID string) (*GameSession, error)
 	if err != nil {
 		return nil, fmt.Errorf("invalid player ID: %w", err)
 	}
-	
+
 	var gameSave models.GameSave
 	result := config.DB.Where("user_id = ? AND mod_id = ?", userID, modID).First(&gameSave)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	
+
 	var state map[string]interface{}
 	if err := json.Unmarshal([]byte(gameSave.State), &state); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal state: %w", err)
 	}
-	
+
 	var recentHistory []Message
 	if gameSave.RecentHistory != "" {
 		if err := json.Unmarshal([]byte(gameSave.RecentHistory), &recentHistory); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal recent history: %w", err)
 		}
 	}
-	
+
 	var displayHistory []string
 	if gameSave.DisplayHistory != "" {
 		if err := json.Unmarshal([]byte(gameSave.DisplayHistory), &displayHistory); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal display history: %w", err)
+		}
+	}
+
+	// 反序列化实体注册表
+	if gameSave.EntityRegistry != "" {
+		if err := sm.entityManager.DeserializeRegistry(playerID, modID, gameSave.EntityRegistry); err != nil {
+			// 日志错误但不中断加载
+			fmt.Printf("Warning: failed to load entity registry: %v\n", err)
 		}
 	}
 	
@@ -311,38 +324,50 @@ func (sm *StateManager) saveToDB(session *GameSession) error {
 	if err != nil {
 		return fmt.Errorf("invalid player ID: %w", err)
 	}
-	
+
 	stateJSON, err := json.Marshal(session.State)
 	if err != nil {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
-	
+
 	recentHistoryJSON, err := json.Marshal(session.RecentHistory)
 	if err != nil {
 		return fmt.Errorf("failed to marshal recent history: %w", err)
 	}
-	
+
 	displayHistoryJSON, err := json.Marshal(session.DisplayHistory)
 	if err != nil {
 		return fmt.Errorf("failed to marshal display history: %w", err)
 	}
-	
-	gameSave := models.GameSave{
-		UserID:           uint(userID),
-		ModID:            session.ModID,
-		SessionDate:      session.SessionDate,
-		State:            string(stateJSON),
-		RecentHistory:    string(recentHistoryJSON),
-		CompressedSummary: session.CompressedSummary,
-		CompressionRound: session.CompressionRound,
-		DisplayHistory:   string(displayHistoryJSON),
+
+	// 序列化实体注册表
+	entityRegistryJSON := ""
+	if sm.entityManager != nil {
+		registryData, err := sm.entityManager.SerializeRegistry(session.PlayerID, session.ModID)
+		if err != nil {
+			fmt.Printf("Warning: failed to serialize entity registry: %v\n", err)
+		} else {
+			entityRegistryJSON = registryData
+		}
 	}
-	
+
+	gameSave := models.GameSave{
+		UserID:            uint(userID),
+		ModID:             session.ModID,
+		SessionDate:       session.SessionDate,
+		State:             string(stateJSON),
+		RecentHistory:     string(recentHistoryJSON),
+		CompressedSummary: session.CompressedSummary,
+		CompressionRound:  session.CompressionRound,
+		DisplayHistory:    string(displayHistoryJSON),
+		EntityRegistry:    entityRegistryJSON, // 添加实体注册表
+	}
+
 	// Use ON CONFLICT (upsert) to ensure only one record per user_id + mod_id
 	result := config.DB.Where("user_id = ? AND mod_id = ?", userID, session.ModID).
 		Assign(gameSave).
 		FirstOrCreate(&gameSave)
-	
+
 	return result.Error
 }
 
@@ -360,6 +385,11 @@ func (sm *StateManager) SaveToFile() error {
 	}
 	
 	return nil
+}
+
+// GetEntityManager returns the entity manager instance
+func (sm *StateManager) GetEntityManager() *EntityManager {
+	return sm.entityManager
 }
 
 // autoSaveLoop periodically saves sessions to file

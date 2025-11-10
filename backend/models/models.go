@@ -61,6 +61,7 @@ type GameSave struct {
 	CompressedSummary string        `json:"compressed_summary" gorm:"type:text"`
 	CompressionRound int            `json:"compression_round" gorm:"default:0"`
 	DisplayHistory   string         `json:"display_history" gorm:"type:text"`
+	EntityRegistry   string         `json:"entity_registry" gorm:"type:text"`  // 新增：实体注册表
 	CreatedAt        time.Time      `json:"created_at"`
 	UpdatedAt        time.Time      `json:"updated_at"`
 	DeletedAt        gorm.DeletedAt `json:"-" gorm:"index"`

@@ -81,11 +81,18 @@ func (cm *CompressionManager) buildCompressionPrompt(messages []Message) string 
 	return fmt.Sprintf(`你是游戏历史记录管理助手。请将以下对话历史压缩为简洁摘要：
 
 🎯 压缩原则：
+- 【必须保留】角色的核心属性（姓名、性别、出身、身份、修为等）
+- 【必须保留】重要NPC的姓名和关系
 - 保留重要的游戏进展和状态变化
 - 保留关键的角色互动和决策
 - 保留影响游戏进程的重要事件
 - 保留玩家的重要成就和获得的物品/技能
 - 保留未完成的任务和目标
+
+⚠️ 特别注意：
+- 绝对不要改变角色的性别描述
+- 绝对不要混淆角色的姓名
+- 保持NPC名字的一致性
 
 ❌ 可以省略：
 - 重复的常规操作描述
@@ -96,7 +103,7 @@ func (cm *CompressionManager) buildCompressionPrompt(messages []Message) string 
 需要压缩的对话：
 %s
 
-请用简洁的语言总结以上对话，突出关键的游戏进展（200字以内）：`, 
+请用简洁的语言总结以上对话，突出关键的游戏进展（200字以内）：`,
 		cm.formatMessages(messages))
 }
 

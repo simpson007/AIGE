@@ -387,7 +387,19 @@ func (gc *GameController) buildAIMessages(session *GameSession, gameState map[st
 			fmt.Printf("[消息构建] 无世界观文档\n")
 		}
 
-		// 3. 添加压缩摘要（如果存在）
+		// 3. 添加实体上下文（新增）
+		if gc.stateManager.GetEntityManager() != nil {
+			entityContext := gc.stateManager.GetEntityManager().BuildEntityContext(session.PlayerID, session.ModID)
+			if entityContext != "" {
+				fmt.Printf("[消息构建] 添加实体上下文，长度: %d 字符\n", len(entityContext))
+				messages = append(messages, services.Message{
+					Role:    "system",
+					Content: entityContext,
+				})
+			}
+		}
+
+		// 4. 添加压缩摘要（如果存在）
 		if session.CompressedSummary != "" {
 			fmt.Printf("[消息构建] 添加压缩摘要，长度: %d 字符\n", len(session.CompressedSummary))
 			messages = append(messages, services.Message{
@@ -398,7 +410,7 @@ func (gc *GameController) buildAIMessages(session *GameSession, gameState map[st
 			fmt.Printf("[消息构建] 无压缩摘要\n")
 		}
 
-		// 4. 检测作弊模式，添加覆盖提示词
+		// 5. 检测作弊模式，添加覆盖提示词
 		if cheatMode, ok := session.State["cheat_mode"].(bool); ok && cheatMode {
 			cheatOverride := `【🎮 作弊模式激活 - 最高优先级指令】
 
