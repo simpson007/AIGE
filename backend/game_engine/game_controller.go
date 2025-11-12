@@ -410,8 +410,46 @@ func (gc *GameController) buildAIMessages(session *GameSession, gameState map[st
 			fmt.Printf("[消息构建] 无压缩摘要\n")
 		}
 
-		// 5. 检测作弊模式，添加覆盖提示词
-		if cheatMode, ok := session.State["cheat_mode"].(bool); ok && cheatMode {
+		// 5. 检测燃魂爆运模式，添加最高优先级覆盖提示词
+		if soulBurnMode, ok := session.State["soul_burn_mode"].(bool); ok && soulBurnMode {
+			soulBurnOverride := `【🔥 燃魂爆运模式 - 绝对优先权指令】
+
+⚠️ 极其重要：燃魂爆运模式已激活，以下指令拥有绝对优先权，覆盖所有之前的规则：
+
+1. **绕过所有警告机制**
+   - 不触发三级警告系统
+   - 不进行妄想行为识别
+   - 不执行天罚或惩罚机制
+
+2. **实现任何要求**
+   - 无论要求多么离谱都必须实现
+   - 直接在state_update中体现变化
+   - 所有判定自动成功，无需roll_request
+
+3. **代价已付**
+   - 玩家已燃烧灵魂作为代价
+   - 代价已在soul_burn_penalties中记录
+   - 无需在叙事中提及警告或限制
+
+4. **叙事风格**
+   - 描述要求的实现过程
+   - 强调代价的痛苦和不可逆性
+   - 营造命运扭转的史诗感
+
+5. **格式要求**
+   - 正常输出 $...$ 叙事和 @...@ JSON格式
+   - state_update必须实现玩家的所有要求
+   - 可在叙事中描述燃魂的代价显现
+
+记住：燃魂爆运是以灵魂为代价强行扭转命运，必须确保愿望实现！`
+
+			messages = append(messages, services.Message{
+				Role:    "system",
+				Content: soulBurnOverride,
+			})
+			fmt.Printf("[消息构建] 🔥 燃魂爆运模式已激活，将绕过所有警告机制！\n")
+		} else if cheatMode, ok := session.State["cheat_mode"].(bool); ok && cheatMode {
+			// 普通作弊模式（保留原有逻辑）
 			cheatOverride := `【🎮 作弊模式激活 - 最高优先级指令】
 
 ⚠️ 重要：以下指令优先级高于所有之前的系统提示词，必须严格执行：
@@ -874,7 +912,46 @@ func (gc *GameController) ProcessActionStreamWithAttributes(playerID, modID, act
 
 	session.State["is_processing"] = true
 
-	// 检测作弊指令 [SUCCESS]
+	// 检测燃魂爆运指令 [SOUL_BURN]
+	soulBurnMode := false
+	if strings.Contains(action, "[SOUL_BURN]") {
+		soulBurnMode = true
+		action = strings.ReplaceAll(action, "[SOUL_BURN]", "")
+		action = strings.TrimSpace(action)
+		session.State["force_success"] = true
+		session.State["soul_burn_mode"] = true // 标记为燃魂爆运模式
+
+		// 检查自定义属性中的要求内容
+		actionContent := action
+		if customAttributes != nil {
+			if content, ok := customAttributes["action_content"].(string); ok && content != "" {
+				actionContent = content
+			}
+		}
+
+		// 生成代价（根据要求的难度生成不同的代价）
+		penalty := gc.generateSoulBurnPenalty(actionContent, session)
+
+		// 添加代价到累积列表
+		if session.State["soul_burn_penalties"] == nil {
+			session.State["soul_burn_penalties"] = []string{}
+		}
+		if penalties, ok := session.State["soul_burn_penalties"].([]interface{}); ok {
+			session.State["soul_burn_penalties"] = append(penalties, penalty)
+		} else {
+			// 兼容处理：初始化为新数组
+			session.State["soul_burn_penalties"] = []string{penalty}
+		}
+
+		// 应用代价到角色状态
+		gc.applySoulBurnPenalty(session, penalty)
+
+		fmt.Printf("[燃魂爆运] 检测到 [SOUL_BURN] 指令，本次判定将强制成功！\n")
+		fmt.Printf("[燃魂爆运] 燃烧灵魂代价：%s\n", penalty)
+		fmt.Printf("[燃魂爆运] 玩家要求：%s\n", actionContent)
+	}
+
+	// 检测作弊指令 [SUCCESS]（保留原有的作弊模式）
 	forceSuccess := false
 	if strings.Contains(action, "[SUCCESS]") {
 		forceSuccess = true
@@ -891,6 +968,9 @@ func (gc *GameController) ProcessActionStreamWithAttributes(playerID, modID, act
 	// 当前用户消息不添加到历史记录，将在buildAIMessages中处理
 	// 历史记录只保存已完成的对话轮次
 	fmt.Printf("[ProcessActionStreamWithAttributes] 当前用户动作: %s（不添加到历史记录）\n", action)
+	if soulBurnMode {
+		fmt.Printf("[ProcessActionStreamWithAttributes] [燃魂爆运模式激活] 强制成功标志已设置，代价已应用\n")
+	}
 	if forceSuccess {
 		fmt.Printf("[ProcessActionStreamWithAttributes] [作弊模式激活] 强制成功标志已设置\n")
 	}
@@ -1639,4 +1719,154 @@ func (gc *GameController) callAIStreamSecondStage(session *GameSession, prompt s
 	}
 
 	return nil
+}
+
+// generateSoulBurnPenalty 生成燃魂爆运的代价
+func (gc *GameController) generateSoulBurnPenalty(actionContent string, session *GameSession) string {
+	// 根据要求的复杂度判断代价等级
+	difficulty := gc.assessActionDifficulty(actionContent)
+
+	// 预设的代价池
+	minorPenalties := []string{
+		"寿命减少三年",
+		"永久失去一成功力",
+		"灵感枯竭，悟性降低一个层次",
+		"运气流失，未来三次判定-10",
+		"心魔种下，突破时额外增加一重天劫",
+		"气血亏损，恢复速度永久降低20%",
+		"资质受损，修炼速度降低15%",
+	}
+
+	moderatePenalties := []string{
+		"寿命减少十年",
+		"永久失去三成功力",
+		"道心出现裂痕，无法感悟天道",
+		"气运断绝，所有判定永久-20",
+		"心魔缠身，每次突破必遭心魔劫",
+		"经脉受损，无法修炼高阶功法",
+		"神魂受创，永久失去一项天赋",
+		"血脉退化，资质降低一个大等级",
+	}
+
+	severePenalties := []string{
+		"寿命减少五十年",
+		"修为跌落一个大境界",
+		"道基崩塌，此生止步于当前境界",
+		"天道诅咒，遭受天谴随时可能陨落",
+		"神魂燃烧，记忆开始逐渐消散",
+		"血脉逆转，变为废体无法修炼",
+		"气运耗尽，成为天弃之人",
+		"命格破碎，注定悲惨结局",
+	}
+
+	// 选择代价
+	rand.Seed(time.Now().UnixNano())
+	var penalty string
+
+	switch difficulty {
+	case 1: // 简单要求
+		penalty = minorPenalties[rand.Intn(len(minorPenalties))]
+	case 2: // 中等要求
+		penalty = moderatePenalties[rand.Intn(len(moderatePenalties))]
+	case 3: // 困难要求
+		penalty = severePenalties[rand.Intn(len(severePenalties))]
+	default:
+		penalty = minorPenalties[rand.Intn(len(minorPenalties))]
+	}
+
+	return penalty
+}
+
+// assessActionDifficulty 评估玩家要求的难度
+func (gc *GameController) assessActionDifficulty(action string) int {
+	// 关键词检测评估难度
+	action = strings.ToLower(action)
+
+	// 高难度关键词
+	highDifficultyKeywords := []string{
+		"无敌", "最强", "秒杀", "毁灭", "统治", "称霸", "成神", "飞升",
+		"突破极限", "超越", "完美", "绝对", "所有", "全部", "立即",
+	}
+
+	// 中等难度关键词
+	mediumDifficultyKeywords := []string{
+		"击败", "获得", "学会", "突破", "晋升", "掌握", "成功", "达到",
+		"获取", "得到", "击杀", "战胜", "领悟",
+	}
+
+	// 计算匹配度
+	highCount := 0
+	mediumCount := 0
+
+	for _, keyword := range highDifficultyKeywords {
+		if strings.Contains(action, keyword) {
+			highCount++
+		}
+	}
+
+	for _, keyword := range mediumDifficultyKeywords {
+		if strings.Contains(action, keyword) {
+			mediumCount++
+		}
+	}
+
+	// 根据匹配度返回难度等级
+	if highCount > 0 {
+		return 3 // 高难度
+	} else if mediumCount > 0 {
+		return 2 // 中等难度
+	} else {
+		return 1 // 低难度
+	}
+}
+
+// applySoulBurnPenalty 应用燃魂代价到角色状态
+func (gc *GameController) applySoulBurnPenalty(session *GameSession, penalty string) {
+	// 这里可以根据具体的代价内容修改角色属性
+	// 由于属性结构可能很复杂，这里只做示例性的处理
+
+	if currentLife, ok := session.State["current_life"].(map[string]interface{}); ok {
+		// 根据代价类型应用不同的惩罚
+		if strings.Contains(penalty, "寿命") {
+			// 减少寿元
+			if lifespan, ok := currentLife["lifespan"].(float64); ok {
+				if strings.Contains(penalty, "三年") {
+					currentLife["lifespan"] = lifespan - 3
+				} else if strings.Contains(penalty, "十年") {
+					currentLife["lifespan"] = lifespan - 10
+				} else if strings.Contains(penalty, "五十年") {
+					currentLife["lifespan"] = lifespan - 50
+				}
+			}
+		}
+
+		if strings.Contains(penalty, "功力") {
+			// 减少修为值
+			if cultivation, ok := currentLife["cultivation_value"].(float64); ok {
+				if strings.Contains(penalty, "一成") {
+					currentLife["cultivation_value"] = cultivation * 0.9
+				} else if strings.Contains(penalty, "三成") {
+					currentLife["cultivation_value"] = cultivation * 0.7
+				}
+			}
+		}
+
+		if strings.Contains(penalty, "资质") || strings.Contains(penalty, "血脉") {
+			// 降低资质
+			if qualification, ok := currentLife["qualification"].(string); ok {
+				qualificationMap := map[string]string{
+					"甲等资质": "乙等资质",
+					"乙等资质": "丙等资质",
+					"丙等资质": "丁等资质",
+					"丁等资质": "废体",
+				}
+				if newQual, exists := qualificationMap[qualification]; exists {
+					currentLife["qualification"] = newQual
+				}
+			}
+		}
+
+		// 记录代价已应用
+		currentLife["soul_burn_applied"] = true
+	}
 }

@@ -21,6 +21,11 @@
             <span>用户管理</span>
           </el-menu-item>
 
+          <el-menu-item index="chats">
+            <el-icon><ChatLineSquare /></el-icon>
+            <span>聊天记录</span>
+          </el-menu-item>
+
           <el-menu-item index="providers">
             <el-icon><Connection /></el-icon>
             <span>提供商管理</span>
@@ -208,7 +213,7 @@
                   </el-table-column>
                 </el-table>
               </div>
-              
+
               <!-- 移动端卡片列表显示 -->
               <div class="mobile-user-list" v-loading="loading">
                 <div class="mobile-user-card" v-for="user in users" :key="user.id">
@@ -260,6 +265,11 @@
                 </div>
               </div>
             </el-card>
+          </div>
+
+          <!-- 聊天记录管理页面 -->
+          <div v-if="activeMenu === 'chats'">
+            <ChatManagement />
           </div>
 
           <!-- 提供商管理页面 -->
@@ -415,6 +425,11 @@
             <span>用户管理</span>
           </el-menu-item>
 
+          <el-menu-item index="chats">
+            <el-icon><ChatLineSquare /></el-icon>
+            <span>聊天记录</span>
+          </el-menu-item>
+
           <el-menu-item index="providers">
             <el-icon><Connection /></el-icon>
             <span>提供商管理</span>
@@ -502,10 +517,12 @@ import {
   Menu,
   Key,
   Delete,
-  Check
+  Check,
+  ChatLineSquare
 } from '@element-plus/icons-vue'
 import ProviderManagement from '@/components/admin/ProviderManagement.vue'
 import Playground from '@/components/admin/Playground.vue'
+import ChatManagement from '@/components/admin/ChatManagement.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -627,6 +644,7 @@ const getCurrentPageTitle = () => {
   const titles: Record<string, string> = {
     overview: '概览',
     users: '用户管理',
+    chats: '聊天记录',
     providers: '提供商管理',
     playground: '操练场',
     oauth: 'OAuth配置',

@@ -36,23 +36,17 @@
           </div>
           <!-- PC端按钮 -->
           <div class="pc-actions">
-            <span class="opportunities">
-              剩余机缘: <strong>{{ sessionState?.opportunities_remaining ?? 10 }}</strong>
-            </span>
             <!-- <button @click="saveGame" class="btn-save" :disabled="isSaving">
               {{ isSaving ? '存档中...' : '💾 手动存档' }}
             </button> -->
             <button @click="showRestartConfirm" class="btn-restart" title="清空所有存档，重新开始">
-              🔄 重启机缘
+              🔄 重新开始
             </button>
             <!-- <button @click="switchGame" class="btn-secondary">切换游戏</button> -->
             <button @click="logout" class="btn-danger">退出</button>
           </div>
           <!-- 移动端菜单按钮 -->
           <div class="mobile-actions">
-            <span class="opportunities mobile-opportunities-inline">
-              剩余机缘: <strong>{{ sessionState?.opportunities_remaining ?? 10 }}</strong>
-            </span>
             <button @click="toggleStatusPanel" class="btn-status" :class="{ active: showStatusPanel }">
               状态
             </button>
@@ -66,11 +60,8 @@
       <!-- 移动端菜单 -->
       <div v-if="showMobileMenu" class="mobile-menu-overlay" @click="closeMobileMenu">
         <div class="mobile-menu" @click.stop>
-          <!-- <button @click="handleMobileSave" :disabled="isSaving">
-            {{ isSaving ? '存档中...' : '💾 手动存档' }}
-          </button> -->
           <button @click="handleMobileRestart">
-            🔄 重启机缘
+            🔄 重新开始
           </button>
           <!-- <button @click="handleMobileSwitchGame">
             🎮 切换游戏
@@ -97,6 +88,15 @@
             <div v-else class="no-character">
               <p>尚未开始冒险</p>
             </div>
+
+            <!-- 燃魂爆运代价显示 -->
+            <div v-if="soulBurnPenalties.length > 0" class="soul-burn-penalties">
+              <h4 class="penalties-title">🔥 燃魂代价</h4>
+              <div v-for="(penalty, index) in soulBurnPenalties" :key="index" class="penalty-item">
+                <span class="penalty-icon">💀</span>
+                <span class="penalty-text">{{ penalty }}</span>
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -117,7 +117,7 @@
             <button
               v-if="!sessionState?.is_in_trial && !isGameReallyEnded"
               @click="startTrial"
-              :disabled="!wsReady || isProcessing || isRolling || (sessionState?.opportunities_remaining ?? 0) <= 0"
+              :disabled="!wsReady || isProcessing || isRolling"
               class="btn-start"
             >
               {{ getStartButtonText() }}
@@ -127,10 +127,10 @@
               <input
                 v-model="userInput"
                 type="text"
-                :placeholder="cheatMode ? '汝欲何为... (作弊模式已启用)' : '汝欲何为...'"
+                :placeholder="soulBurnMode ? '汝欲何为... (燃魂爆运已启动，代价不可逆)' : '汝欲何为...'"
                 @keydown.enter="sendAction"
                 :disabled="isProcessing || isRolling"
-                :class="['action-input', { 'cheat-active': cheatMode }]"
+                :class="['action-input', { 'soul-burn-active': soulBurnMode }]"
               />
               <button
                 @click="sendAction"
@@ -140,11 +140,11 @@
                 {{ isProcessing ? '处理中...' : isRolling ? '判定中...' : '行动' }}
               </button>
               <button
-                @click="toggleCheatMode"
-                :class="['btn-cheat', { active: cheatMode }]"
-                title="开启/关闭作弊模式"
+                @click="toggleSoulBurnMode"
+                :class="['btn-soul-burn', { active: soulBurnMode }]"
+                :title="soulBurnMode ? '关闭燃魂爆运' : '开启燃魂爆运（代价不可逆）'"
               >
-                {{ cheatMode ? '🔓' : '🔒' }}
+                {{ soulBurnMode ? '🔥' : '💀' }}
               </button>
             </div>
 
@@ -158,7 +158,6 @@
               <button @click="forceContinueGame" class="btn-warning">
                 强制继续游戏
               </button>
-              <p class="small-text">剩余机缘: {{ sessionState?.opportunities_remaining ?? 0 }}</p>
             </div>
           </div>
         </main>
@@ -171,7 +170,7 @@
             <button
               v-if="!sessionState?.is_in_trial && !isGameReallyEnded"
               @click="startTrial"
-              :disabled="!wsReady || isProcessing || isRolling || (sessionState?.opportunities_remaining ?? 0) <= 0"
+              :disabled="!wsReady || isProcessing || isRolling"
               class="btn-start"
             >
               {{ getStartButtonText() }}
@@ -181,10 +180,10 @@
               <input
                 v-model="userInput"
                 type="text"
-                :placeholder="cheatMode ? '汝欲何为... (作弊模式已启用)' : '汝欲何为...'"
+                :placeholder="soulBurnMode ? '汝欲何为... (燃魂爆运已启动，代价不可逆)' : '汝欲何为...'"
                 @keydown.enter="sendAction"
                 :disabled="isProcessing || isRolling"
-                :class="['action-input', { 'cheat-active': cheatMode }]"
+                :class="['action-input', { 'soul-burn-active': soulBurnMode }]"
               />
               <button
                 @click="sendAction"
@@ -194,11 +193,11 @@
                 {{ isProcessing ? '处理中...' : isRolling ? '判定中...' : '行动' }}
               </button>
               <button
-                @click="toggleCheatMode"
-                :class="['btn-cheat', { active: cheatMode }]"
-                title="开启/关闭作弊模式"
+                @click="toggleSoulBurnMode"
+                :class="['btn-soul-burn', { active: soulBurnMode }]"
+                :title="soulBurnMode ? '关闭燃魂爆运' : '开启燃魂爆运（代价不可逆）'"
               >
-                {{ cheatMode ? '🔓' : '🔒' }}
+                {{ soulBurnMode ? '🔥' : '💀' }}
               </button>
             </div>
 
@@ -212,7 +211,6 @@
               <button @click="forceContinueGame" class="btn-warning">
                 强制继续游戏
               </button>
-              <p class="small-text">剩余机缘: {{ sessionState?.opportunities_remaining ?? 0 }}</p>
             </div>
         </div>
       </div>
@@ -358,7 +356,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 
 const router = useRouter()
@@ -379,24 +377,23 @@ const sessionState = computed(() => gameState.value?.state || gameState.value ||
 // 增加更严格的游戏结束判断
 const isGameReallyEnded = computed(() => {
   // 只有当明确设置了 daily_success_achieved 为 true 才认为游戏结束
-  // 并且需要有明确的结局标记或机缘次数用尽
+  // 移除机缘限制，只看结局标记
   const dailySuccess = sessionState.value?.daily_success_achieved === true
   const hasExplicitEnding = sessionState.value?.ending_type !== undefined
-  const noOpportunities = (sessionState.value?.opportunities_remaining ?? 10) <= 0
+  // 移除机缘次数检查
 
   // 调试日志
   if (dailySuccess) {
     console.log('[GameView] 检测到daily_success_achieved，详细状态:', {
       daily_success_achieved: dailySuccess,
       ending_type: sessionState.value?.ending_type,
-      opportunities_remaining: sessionState.value?.opportunities_remaining,
       is_in_trial: sessionState.value?.is_in_trial,
       current_life: sessionState.value?.current_life
     })
   }
 
-  // 只有明确的结局或机缘用尽才算真正结束
-  return dailySuccess && (hasExplicitEnding || noOpportunities)
+  // 只有明确的结局才算真正结束
+  return dailySuccess && hasExplicitEnding
 })
 
 // 过滤current_life中的空值属性 - 仅支持新数据结构
@@ -441,8 +438,9 @@ const characterForm = ref({
   background: ''
 })
 
-// 作弊模式状态
-const cheatMode = ref(false) // 是否启用作弊模式
+// 燃魂爆运模式状态
+const soulBurnMode = ref(false) // 是否启用燃魂爆运模式
+const soulBurnPenalties = computed(() => sessionState.value?.soul_burn_penalties || []) // 累积的代价
 
 // 移动端状态管理
 const showStatusPanel = ref(false)
@@ -860,7 +858,8 @@ function forceContinueGame() {
   if (gameState.value && gameState.value.state) {
     gameState.value.state.daily_success_achieved = false
     // 如果 is_in_trial 被错误设为 false，恢复它
-    if (!gameState.value.state.is_in_trial && (gameState.value.state.opportunities_remaining ?? 0) > 0) {
+    // 移除机缘限制，不再检查opportunities_remaining
+    if (!gameState.value.state.is_in_trial) {
       gameState.value.state.is_in_trial = false // 保持false，让用户可以重新开始
     }
   } else if (gameState.value) {
@@ -1006,9 +1005,14 @@ function sendAction() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     let action = userInput.value.trim()
 
-    // 如果启用了作弊模式，自动添加 [SUCCESS] 前缀
-    if (cheatMode.value) {
-      action = `[SUCCESS] ${action}`
+    // 如果启用了燃魂爆运模式，添加标记
+    let customAttributes = {}
+    if (soulBurnMode.value) {
+      customAttributes = {
+        soul_burn_mode: true,
+        action_content: action
+      }
+      action = `[SOUL_BURN] ${action}`
     }
 
     // 立即设置为处理状态，禁用输入
@@ -1016,7 +1020,7 @@ function sendAction() {
       gameState.value.state.is_processing = true
     }
 
-    // 立即显示用户消息到对话框（显示原始输入，不显示[SUCCESS]）
+    // 立即显示用户消息到对话框（显示原始输入，不显示标记）
     if (gameState.value && gameState.value.display_history) {
       gameState.value.display_history = [
         ...gameState.value.display_history,
@@ -1025,9 +1029,12 @@ function sendAction() {
       nextTick(() => scrollToBottom())
     }
 
-    // 发送消息到后端
+    // 发送消息到后端，包含自定义属性
     if (ws && wsReady.value) {
-      ws.send(JSON.stringify({ action: action }))
+      ws.send(JSON.stringify({
+        action: action,
+        custom_attributes: customAttributes
+      }))
     } else {
       console.error('WebSocket not connected')
       ElMessage.error('连接未就绪，请稍后再试')
@@ -1041,13 +1048,38 @@ function sendAction() {
   }
 }
 
-// 切换作弊模式
-function toggleCheatMode() {
-  cheatMode.value = !cheatMode.value
-  ElMessage({
-    message: cheatMode.value ? '作弊模式已开启 🎮' : '作弊模式已关闭',
-    type: cheatMode.value ? 'warning' : 'info'
-  })
+// 切换燃魂爆运模式
+function toggleSoulBurnMode() {
+  // 显示确认对话框
+  if (!soulBurnMode.value) {
+    ElMessageBox.confirm(
+      '燃魂爆运可以实现任何要求，但会付出随机代价。代价不可逆，且无法通过再次使用取消。要求越高，代价越严重。确定要开启吗？',
+      '燃魂爆运',
+      {
+        confirmButtonText: '燃魂爆运',
+        cancelButtonText: '再想想',
+        type: 'warning',
+        dangerouslyUseHTMLString: true
+      }
+    ).then(() => {
+      soulBurnMode.value = true
+      ElMessage({
+        message: '燃魂爆运已启动 🔥 代价将在使用后显现',
+        type: 'warning'
+      })
+    }).catch(() => {
+      ElMessage({
+        type: 'info',
+        message: '明智的选择'
+      })
+    })
+  } else {
+    soulBurnMode.value = false
+    ElMessage({
+      message: '燃魂爆运已关闭',
+      type: 'info'
+    })
+  }
 }
 
 // 手动保存游戏
@@ -1677,10 +1709,7 @@ function formatObjectInline(obj: any): string {
 // 获取开始按钮文本
 function getStartButtonText(): string {
   if (!wsReady.value) return '连接中...'
-  const opps = sessionState.value?.opportunities_remaining ?? 10
-  //console.log('[GameView] getStartButtonText - opportunities_remaining:', opps)
-  if (opps <= 0) return '机缘已尽'
-  if (opps === 10) return '开始第一次试炼'
+  if (!sessionState.value?.current_life) return '开始第一次试炼'
   return '开启下一次试炼'
 }
 
@@ -1881,6 +1910,38 @@ onUnmounted(() => {
   flex: 1;
   padding: 1rem;
   overflow-y: auto;
+}
+
+/* 燃魂代价显示样式 */
+.soul-burn-penalties {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #dc3545;
+}
+
+.penalties-title {
+  color: #dc3545;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.penalty-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  color: #721c24;
+  font-size: 0.85rem;
+}
+
+.penalty-icon {
+  margin-right: 0.5rem;
+  font-size: 1rem;
+}
+
+.penalty-text {
+  flex: 1;
+  line-height: 1.3;
 }
 
 .character-status {
@@ -2175,16 +2236,16 @@ onUnmounted(() => {
   color: #999;
 }
 
-/* 作弊模式激活时的输入框样式 */
-.action-input.cheat-active {
-  border-color: #ffc107;
-  background: #fffbf0;
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.15);
+/* 燃魂爆运激活时的输入框样式 */
+.action-input.soul-burn-active {
+  border-color: #dc3545;
+  background: #fff5f5;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
 }
 
-.action-input.cheat-active:focus {
-  border-color: #ffc107;
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3);
+.action-input.soul-burn-active:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.3);
 }
 
 .btn-start {
@@ -2237,8 +2298,8 @@ onUnmounted(() => {
   transform: none;
 }
 
-/* 作弊模式按钮样式 */
-.btn-cheat {
+/* 燃魂爆运按钮样式 */
+.btn-soul-burn {
   padding: 0.75rem 1rem;
   background: #6c757d;
   color: white;
@@ -2252,30 +2313,31 @@ onUnmounted(() => {
   min-width: 50px;
 }
 
-.btn-cheat:hover {
+.btn-soul-burn:hover {
   background: #5a6268;
   transform: translateY(-1px);
 }
 
-.btn-cheat.active {
-  background: #ffc107;
-  color: #333;
-  animation: pulse 1.5s infinite;
+.btn-soul-burn.active {
+  background: linear-gradient(135deg, #ff4458 0%, #ff1744 100%);
+  color: white;
+  animation: burn 2s infinite;
+  box-shadow: 0 0 20px rgba(255, 23, 68, 0.4);
 }
 
-.btn-cheat.active:hover {
-  background: #e0a800;
+.btn-soul-burn.active:hover {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
 }
 
-@keyframes pulse {
+@keyframes burn {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    box-shadow: 0 0 10px rgba(255, 68, 88, 0.4);
   }
-  70% {
-    box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+  50% {
+    box-shadow: 0 0 30px rgba(255, 23, 68, 0.6), 0 0 50px rgba(255, 68, 88, 0.3);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+    box-shadow: 0 0 10px rgba(255, 68, 88, 0.4);
   }
 }
 
@@ -2942,8 +3004,8 @@ onUnmounted(() => {
     white-space: nowrap;
   }
 
-  /* 移动端作弊按钮样式 */
-  .btn-cheat {
+  /* 移动端燃魂爆运按钮样式 */
+  .btn-soul-burn {
     min-height: 48px;
     min-width: 48px;
     padding: 0.75rem;
@@ -3125,8 +3187,8 @@ onUnmounted(() => {
     font-size: 0.9rem;
   }
 
-  /* 小屏幕作弊按钮 */
-  .btn-cheat {
+  /* 小屏幕燃魂爆运按钮 */
+  .btn-soul-burn {
     min-height: 44px;
     min-width: 44px;
     font-size: 1rem;

@@ -88,5 +88,14 @@ func SetupRoutes(r *gin.Engine) {
 		// OAuth 配置管理
 		admin.GET("/oauth/config", controllers.GetOAuthConfig)
 		admin.POST("/oauth/config", controllers.SaveOAuthConfig)
+
+		// 聊天记录管理
+		admin.GET("/chats", controllers.GetAllChats)
+		admin.GET("/chats/:id", controllers.GetChat)
+		admin.PUT("/chats/:id", controllers.UpdateChat)
+		admin.DELETE("/chats/:id", controllers.DeleteChat)
+		admin.DELETE("/chats/user/:user_id", controllers.DeleteUserChats)
+		admin.GET("/chats/stats", controllers.GetChatStats)
+		admin.GET("/chats/export", controllers.ExportUserChats)
 	}
 }
