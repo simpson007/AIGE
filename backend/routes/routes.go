@@ -48,7 +48,9 @@ func SetupRoutes(r *gin.Engine) {
 	admin.Use(middleware.AdminMiddleware())
 	{
 		admin.GET("/users", controllers.GetUsers)
+		admin.POST("/users", controllers.CreateUser)
 		admin.GET("/users/:id", controllers.GetUser)
+		admin.PUT("/users/:id", controllers.UpdateUser)
 		admin.PUT("/users/:id/password", controllers.UpdateUserPassword)
 		admin.DELETE("/users/:id", controllers.DeleteUser)
 		admin.PUT("/users/:id/toggle-admin", controllers.ToggleUserAdmin)

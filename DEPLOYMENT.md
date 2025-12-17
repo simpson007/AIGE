@@ -249,7 +249,7 @@ curl http://101.43.42.250:8182/health
 curl http://101.43.42.250:8182/api/game/mods
 ```
 
-应该能看到 `guzhenren` 等游戏信息。
+应该能看到 `FateBound` 等游戏信息。
 
 ### 4. 访问前端
 

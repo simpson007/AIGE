@@ -1,0 +1,49 @@
+{
+  "game_id": "FateBound",
+  "name": "宿命之下",
+  "version": "1.0.1",
+  "description": "人是万物之灵，蛊是天地之精。 欢迎来到《宿命之下》——这不仅是修行的世界，更是猎杀的修罗场。 在这里，慈悲是弱者的墓志铭。身为蛊师，你必须不择手段",
+  "author": "yusj",
+  "game_config": {
+    "initial_opportunities": 10,
+    "reward_scaling_factor": 500000,
+    "max_token_history": 150000,
+    "auto_save_interval": 300,
+    "roll_settings": {
+      "critical_success_threshold": 0.05,
+      "critical_failure_threshold": 0.96,
+      "default_sides": 100
+    },
+    "cheat_check": {
+      "enabled": true,
+      "check_interval": 3,
+      "model": "gpt-4o-mini"
+    }
+  },
+  "prompts": {
+    "game_master": "prompts/game_master.txt",
+    "start_game": "prompts/start_game.txt"
+  },
+  "lore_files": [
+    "蛊真人.md",
+    "其他蛊虫.md",
+    "凡蛊介绍.md",
+    "仙蛊介绍.md"
+  ],
+  "initial_state": {
+    "opportunities_remaining": 10,
+    "daily_success_achieved": false,
+    "is_in_trial": false,
+    "is_processing": false,
+    "current_life": null,
+    "display_history": [],
+    "roll_event": null,
+    "ascension_progress": {
+      "stage": 0,
+      "fragments_collected": 0,
+      "trials_completed": {},
+      "hidden_knowledge": []
+    }
+  },
+  "welcome_message": "【**宿命之下**】\n\n> *“汝已至蛊界，愿汝成真月，出天山，戏云海，照古今，行走在黑暗的诸天之上。”*\n\n在宿命的洪流之中，凡人命如草芥，唯有成为蛊师，方能掌握一丝主动。\n\n此乃逆天之路，从**初开窍穴**起步，汝需踏过无数同道的尸骸，历经一转至五转的腥风血雨，才有一线机会渡劫羽化，成就**蛊仙**，跳出棋盘做棋手。\n\n**五域皆是猎场，风土各藏杀机：**\n\n- **中洲 · 宗**\n> 万里平原古派尊，天庭高卧掌乾坤。\n> 寒门亦有登天路，只认师承不认亲。\n\n- **北原 · 烈**\n> 霜风烈马啸苍穹，王庭血战染深红。\n> 黄金帐下多才俊，勇谋兼备傲群雄。\n\n- **南疆 · 幽**\n> 十万大山锁重楼，地脉深藏土道修。\n> 且把寨门依险踞，不通尘世竞风流。\n\n- **西漠 · 艰**\n> 黄沙漫卷火风狂，绿洲点点贵如粮。\n> 算尽锱铢知进退，为求生路且低昂。\n\n- **东海 · 阔**\n> 碧海潮生富甲名，界壁残缺任客行。\n> 且喜太平多宝物，温柔乡里忘刀兵。\n\n **择一道而精，以万道为食**：\n- **魂道**：生者短暂，死魂永存。炼魂吞魄，操控幽冥大军，让敌人死后亦不得安宁。\n- **智道**：以天下为棋局，算尽人心鬼蜮。在未出手前，结局已在汝推演之中。\n- **力道**：一力降十会。将肉身锤炼至极致，任尔千般变化，吾自一拳轰碎。\n- **奴道**：兽潮汹涌，皆为汝用。一人即是一只军队，用数量堆砌出绝对的死亡地带。\n- **炎道**：毁灭的艺术。以暴烈之火焚烧世间一切不洁与阻碍，灰烬中求新生。\n- **剑道**：宁折不弯，杀伐第一。追求极致的锋芒，一剑破万法，挡吾道者，斩！\n\n **生存法则**：蛊战搏杀无眼，窍穴资源必争。每一次战力评估，都是生死预判。\n\n **机缘险中求**：探索上古福地，挖掘异域遗迹，夺取前人蛊仙传承。\n\n**宿命的终局：**\n\n **逆天改命**：成就九转尊者，永生不死，彻底超脱宿命。\n **一方枭雄**：魔威盖世或正道魁首，威凌天下。\n **道消身殒**：成为他人踏脚石，真灵俱灭，消散于天地之间。\n\n---\n\n*天意高难问，人情薄如纸。*\n\n宿命已为汝安排下独特的出身、空窍与本命蛊虫。棋局已开，**愿道友斩断尘缘，心狠手辣，于宿命之下，杀出个永恒未来！**"
+}

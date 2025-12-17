@@ -4,7 +4,7 @@
 
 1. **Docker 命令**: `docker-compose` → `docker compose`（新版命令）
 2. **项目路径**: `/root/AIGE` → `/opt/AIGE`
-3. **Git 仓库**: `simpson007/guzhenren` → `simpson007/AIGE`
+3. **Git 仓库**: `simpson007/FateBound` → `simpson007/AIGE`
 
 ---
 
@@ -97,7 +97,7 @@ echo ""
 echo "=== MOD 列表 ==="
 curl http://localhost:8182/api/game/mods
 
-# 应该返回 guzhenren 游戏信息
+# 应该返回 FateBound 游戏信息
 
 # 查看后端日志
 echo ""

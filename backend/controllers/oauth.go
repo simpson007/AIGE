@@ -176,7 +176,7 @@ func LinuxDoCallback(c *gin.Context) {
 		var existingEmailUser models.User
 		if config.DB.Where("email = ?", email).First(&existingEmailUser).Error == nil {
 			existingEmailUser.OAuthProvider = "linux-do"
-			existingEmailUser.OAuthID = oauthID
+			existingEmailUser.OAuthID = &oauthID
 			if userInfo.Avatar != "" {
 				existingEmailUser.Avatar = userInfo.Avatar
 			}
@@ -201,7 +201,7 @@ func LinuxDoCallback(c *gin.Context) {
 				Username:      username,
 				Email:         email,
 				OAuthProvider: "linux-do",
-				OAuthID:       oauthID,
+				OAuthID:       &oauthID,
 				Avatar:        userInfo.Avatar,
 				IsAdmin:       false,
 			}

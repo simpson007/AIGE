@@ -349,8 +349,7 @@ const showStats = ref(false)
 
 const userList = ref<any[]>([])
 const modList = ref<any[]>([
-  { id: 'xiuxian2', name: '修仙2' },
-  { id: 'guzhenren', name: '古真人' }
+  { id: 'FateBound', name: '宿命之下' }
 ])
 
 const filters = reactive({

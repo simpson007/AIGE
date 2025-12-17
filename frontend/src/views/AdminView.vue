@@ -163,10 +163,16 @@
               <template #header>
                 <div class="card-header">
                   <span>用户管理</span>
-                  <el-button type="primary" @click="refreshUsers">
-                    <el-icon><Refresh /></el-icon>
-                    刷新
-                  </el-button>
+                  <div class="header-actions">
+                    <el-button type="primary" @click="showCreateUserDialog">
+                      <el-icon><Plus /></el-icon>
+                      新增用户
+                    </el-button>
+                    <el-button @click="refreshUsers">
+                      <el-icon><Refresh /></el-icon>
+                      刷新
+                    </el-button>
+                  </div>
                 </div>
               </template>
 
@@ -183,9 +189,16 @@
                       </el-tag>
                     </template>
                   </el-table-column>
-                  <el-table-column label="操作" min-width="200">
+                  <el-table-column label="操作" min-width="280">
                     <template #default="scope">
                       <div class="action-buttons">
+                        <el-button
+                          size="small"
+                          type="primary"
+                          @click="showEditUserDialog(scope.row)"
+                        >
+                          编辑
+                        </el-button>
                         <el-button
                           size="small"
                           @click="showPasswordDialog(scope.row)"
@@ -236,6 +249,14 @@
                     </div>
                   </div>
                   <div class="user-actions">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      @click="showEditUserDialog(user)"
+                      class="mobile-action-btn"
+                    >
+                      <el-icon><Edit /></el-icon>
+                    </el-button>
                     <el-button
                       size="small"
                       @click="showPasswordDialog(user)"
@@ -453,6 +474,50 @@
       </div>
     </el-drawer>
 
+    <!-- 新增/编辑用户对话框 -->
+    <el-dialog
+      v-model="userDialogVisible"
+      :title="isEditingUser ? '编辑用户' : '新增用户'"
+      width="450px"
+    >
+      <el-form 
+        ref="userFormRef"
+        :model="userForm"
+        :rules="userFormRules"
+        label-width="100px"
+      >
+        <el-form-item label="用户名" prop="username">
+          <el-input
+            v-model="userForm.username"
+            placeholder="请输入用户名"
+          />
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input
+            v-model="userForm.email"
+            placeholder="请输入邮箱"
+          />
+        </el-form-item>
+        <el-form-item v-if="!isEditingUser" label="密码" prop="password">
+          <el-input
+            v-model="userForm.password"
+            type="password"
+            show-password
+            placeholder="请输入密码"
+          />
+        </el-form-item>
+        <el-form-item label="管理员">
+          <el-switch v-model="userForm.is_admin" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="userDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="userSubmitting" @click="submitUser">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 修改密码对话框 -->
     <el-dialog
       v-model="passwordDialogVisible"
@@ -498,6 +563,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue'
+import api from '@/utils/api'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAdminStore } from '@/stores/admin'
@@ -518,7 +584,9 @@ import {
   Key,
   Delete,
   Check,
-  ChatLineSquare
+  ChatLineSquare,
+  Plus,
+  Edit
 } from '@element-plus/icons-vue'
 import ProviderManagement from '@/components/admin/ProviderManagement.vue'
 import Playground from '@/components/admin/Playground.vue'
@@ -536,6 +604,18 @@ const selectedUser = ref<User | null>(null)
 const passwordFormRef = ref<FormInstance>()
 const activeMenu = ref('overview')
 const oauthSaving = ref(false)
+
+// 新增/编辑用户相关
+const userDialogVisible = ref(false)
+const isEditingUser = ref(false)
+const userSubmitting = ref(false)
+const userFormRef = ref<FormInstance>()
+const userForm = reactive({
+  username: '',
+  email: '',
+  password: '',
+  is_admin: false
+})
 
 // 移动端状态
 const mobileMenuVisible = ref(false)
@@ -575,6 +655,21 @@ const passwordRules = reactive({
     { validator: validateConfirmPassword, trigger: 'blur' }
   ]
 })
+
+const userFormRules = computed(() => ({
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 2, max: 20, message: '用户名长度在 2 到 20 个字符', trigger: 'blur' }
+  ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+  ],
+  password: isEditingUser.value ? [] : [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度在 6 到 20 个字符', trigger: 'blur' }
+  ]
+}))
 
 onMounted(() => {
   if (!authStore.isAdmin()) {
@@ -666,6 +761,63 @@ const loadUsers = async () => {
 
 const refreshUsers = () => {
   loadUsers()
+}
+
+const showCreateUserDialog = () => {
+  isEditingUser.value = false
+  selectedUser.value = null
+  userForm.username = ''
+  userForm.email = ''
+  userForm.password = ''
+  userForm.is_admin = false
+  userDialogVisible.value = true
+}
+
+const showEditUserDialog = (user: User) => {
+  isEditingUser.value = true
+  selectedUser.value = user
+  userForm.username = user.username
+  userForm.email = user.email || ''
+  userForm.password = ''
+  userForm.is_admin = user.is_admin
+  userDialogVisible.value = true
+}
+
+const submitUser = async () => {
+  if (!userFormRef.value) return
+  
+  try {
+    const valid = await userFormRef.value.validate()
+    if (!valid) return
+
+    userSubmitting.value = true
+    
+    if (isEditingUser.value && selectedUser.value) {
+      // 编辑用户
+      await api.put(`/admin/users/${selectedUser.value.id}`, {
+        username: userForm.username,
+        email: userForm.email,
+        is_admin: userForm.is_admin
+      })
+      ElMessage.success('用户信息更新成功')
+    } else {
+      // 新增用户
+      await api.post('/admin/users', {
+        username: userForm.username,
+        email: userForm.email,
+        password: userForm.password,
+        is_admin: userForm.is_admin
+      })
+      ElMessage.success('用户创建成功')
+    }
+    
+    userDialogVisible.value = false
+    loadUsers()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.error || (isEditingUser.value ? '更新用户失败' : '创建用户失败'))
+  } finally {
+    userSubmitting.value = false
+  }
 }
 
 const showPasswordDialog = (user: User) => {
@@ -846,6 +998,11 @@ const saveSystemSettings = () => {
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .dialog-footer {

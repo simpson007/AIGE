@@ -3,7 +3,7 @@
     <!-- 游戏AI配置区域 -->
     <div class="game-ai-config" style="margin-bottom: 24px;">
       <div class="config-header">
-        <h3>🎮 游戏AI配置</h3>
+        <h3>游戏AI配置</h3>
         <el-button type="success" size="small" @click="saveGameConfig" :loading="savingGameConfig">
           保存配置
         </el-button>

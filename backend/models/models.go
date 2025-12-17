@@ -13,7 +13,7 @@ type User struct {
 	Email         string         `json:"email"`
 	IsAdmin       bool           `json:"is_admin" gorm:"default:false"`
 	OAuthProvider string         `json:"oauth_provider" gorm:"column:oauth_provider;index"`
-	OAuthID       string         `json:"oauth_id" gorm:"column:oauth_id;uniqueIndex"`
+	OAuthID       *string        `json:"oauth_id" gorm:"column:oauth_id;uniqueIndex"`
 	Avatar        string         `json:"avatar"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
