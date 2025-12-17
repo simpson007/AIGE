@@ -90,7 +90,7 @@ const toast = reactive({
   type: 'info'
 })
 
-const showToast = (msg: string, type: 'success' | 'error' = 'info') => {
+const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
   toast.message = msg
   toast.type = type
   toast.show = true
