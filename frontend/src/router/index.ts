@@ -6,7 +6,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/login'
+      redirect: '/game'
     },
     {
       path: '/login',
@@ -25,11 +25,6 @@ const router = createRouter({
       name: 'game',
       component: () => import('@/views/GameView.vue'),
       meta: { requiresAuth: true }
-    },
-    {
-      path: '/chat',
-      name: 'chat',
-      redirect: '/game' // 旧的聊天页面重定向到游戏页面
     },
     {
       path: '/admin',
