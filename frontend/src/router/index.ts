@@ -6,7 +6,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/game'
+      redirect: '/chat'
     },
     {
       path: '/login',
@@ -21,8 +21,8 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
-      path: '/game',
-      name: 'game',
+      path: '/chat',
+      name: 'chat',
       component: () => import('@/views/GameView.vue'),
       meta: { requiresAuth: true }
     },
@@ -59,7 +59,7 @@ router.beforeEach(async (to, from, next) => {
     
     // 如果路由需要管理员权限
     if (to.meta.requiresAdmin && !authStore.isAdmin()) {
-      next('/game')
+      next('/chat')
       return
     }
   } else {
@@ -68,7 +68,7 @@ router.beforeEach(async (to, from, next) => {
       if (authStore.isAdmin()) {
         next('/admin')
       } else {
-        next('/game')
+        next('/chat')
       }
       return
     }
