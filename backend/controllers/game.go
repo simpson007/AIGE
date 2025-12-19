@@ -576,13 +576,15 @@ func SaveValidatorConfig(c *gin.Context) {
 	saveSystemConfigToDB("validator_rule_check", boolToString(req.UseRuleValidation))
 	// 保存一致性校验开关
 	saveSystemConfigToDB("validator_consistency_check", boolToString(req.UseConsistencyCheck))
+	// 保存逻辑一致性校验开关
+	saveSystemConfigToDB("validator_logic_check", boolToString(req.UseLogicCheck))
 	// 保存自动修正开关
 	saveSystemConfigToDB("validator_auto_correction", boolToString(req.UseAutoCorrection))
 	// 保存校验模型ID
 	saveSystemConfigToDB("validator_model_id", req.ValidatorModelID)
 
-	fmt.Printf("[SaveValidatorConfig] 校验器配置已保存 - 启用: %v, 规则校验: %v, 一致性校验: %v, 自动修正: %v, 模型ID: %s\n",
-		req.Enabled, req.UseRuleValidation, req.UseConsistencyCheck, req.UseAutoCorrection, req.ValidatorModelID)
+	fmt.Printf("[SaveValidatorConfig] 校验器配置已保存 - 启用: %v, 规则校验: %v, 一致性校验: %v, 逻辑校验: %v, 自动修正: %v, 模型ID: %s\n",
+		req.Enabled, req.UseRuleValidation, req.UseConsistencyCheck, req.UseLogicCheck, req.UseAutoCorrection, req.ValidatorModelID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "校验器配置已保存"})
 }

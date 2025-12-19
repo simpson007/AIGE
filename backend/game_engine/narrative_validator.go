@@ -16,6 +16,7 @@ type ValidatorConfig struct {
 	Enabled              bool   `json:"enabled"`                // 是否启用校验
 	UseRuleValidation    bool   `json:"use_rule_validation"`    // 是否启用规则校验（AI）
 	UseConsistencyCheck  bool   `json:"use_consistency_check"`  // 是否启用一致性校验（AI）
+	UseLogicCheck        bool   `json:"use_logic_check"`        // 是否启用逻辑一致性校验（AI）
 	UseAutoCorrection    bool   `json:"use_auto_correction"`    // 是否启用自动修正（AI）
 	ValidatorModelID     string `json:"validator_model_id"`     // 校验用模型ID
 }
@@ -28,6 +29,7 @@ type NarrativeValidator struct {
 	enabled             bool
 	useRuleValidation   bool       // 规则校验（AI检测禁止词汇）
 	useConsistencyCheck bool       // 一致性校验（AI检测判定结果与叙事是否一致）
+	useLogicCheck       bool       // 逻辑一致性校验（AI检测叙事内部逻辑是否自洽）
 	useAutoCorrection   bool       // 自动修正（AI修正问题叙事）
 	validatorProvider   *AIProvider
 	configMutex         sync.RWMutex
@@ -55,6 +57,7 @@ func NewNarrativeValidator(aiClient *services.AIClient) *NarrativeValidator {
 		enabled:             true,
 		useRuleValidation:   true,
 		useConsistencyCheck: true,
+		useLogicCheck:       true,
 		useAutoCorrection:   true,
 	}
 	// 从数据库加载配置
@@ -91,6 +94,12 @@ func (nv *NarrativeValidator) LoadConfig() {
 		nv.useConsistencyCheck = consistencyConfig.Value == "true"
 	}
 
+	// 加载逻辑一致性校验开关
+	var logicConfig models.SystemConfig
+	if err := db.Where("key = ?", "validator_logic_check").First(&logicConfig).Error; err == nil {
+		nv.useLogicCheck = logicConfig.Value == "true"
+	}
+
 	// 加载自动修正开关
 	var correctionConfig models.SystemConfig
 	if err := db.Where("key = ?", "validator_auto_correction").First(&correctionConfig).Error; err == nil {
@@ -107,8 +116,8 @@ func (nv *NarrativeValidator) LoadConfig() {
 		}
 	}
 
-	fmt.Printf("[NarrativeValidator] 配置加载完成 - 启用: %v, 规则校验: %v, 一致性校验: %v, 自动修正: %v\n",
-		nv.enabled, nv.useRuleValidation, nv.useConsistencyCheck, nv.useAutoCorrection)
+	fmt.Printf("[NarrativeValidator] 配置加载完成 - 启用: %v, 规则校验: %v, 一致性校验: %v, 逻辑校验: %v, 自动修正: %v\n",
+		nv.enabled, nv.useRuleValidation, nv.useConsistencyCheck, nv.useLogicCheck, nv.useAutoCorrection)
 }
 
 // loadProviderFromModelID 根据模型ID加载Provider配置
@@ -169,6 +178,7 @@ func (nv *NarrativeValidator) UpdateConfig(cfg ValidatorConfig) {
 	nv.enabled = cfg.Enabled
 	nv.useRuleValidation = cfg.UseRuleValidation
 	nv.useConsistencyCheck = cfg.UseConsistencyCheck
+	nv.useLogicCheck = cfg.UseLogicCheck
 	nv.useAutoCorrection = cfg.UseAutoCorrection
 
 	if cfg.ValidatorModelID != "" {
@@ -182,8 +192,8 @@ func (nv *NarrativeValidator) UpdateConfig(cfg ValidatorConfig) {
 		fmt.Printf("[NarrativeValidator] 清除校验模型配置，将使用默认轻量模型\n")
 	}
 
-	fmt.Printf("[NarrativeValidator] 配置已更新 - 启用: %v, 规则校验: %v, 一致性校验: %v, 自动修正: %v\n",
-		nv.enabled, nv.useRuleValidation, nv.useConsistencyCheck, nv.useAutoCorrection)
+	fmt.Printf("[NarrativeValidator] 配置已更新 - 启用: %v, 规则校验: %v, 一致性校验: %v, 逻辑校验: %v, 自动修正: %v\n",
+		nv.enabled, nv.useRuleValidation, nv.useConsistencyCheck, nv.useLogicCheck, nv.useAutoCorrection)
 }
 
 // GetConfig 获取当前配置
@@ -195,6 +205,7 @@ func (nv *NarrativeValidator) GetConfig() ValidatorConfig {
 		Enabled:             nv.enabled,
 		UseRuleValidation:   nv.useRuleValidation,
 		UseConsistencyCheck: nv.useConsistencyCheck,
+		UseLogicCheck:       nv.useLogicCheck,
 		UseAutoCorrection:   nv.useAutoCorrection,
 	}
 
@@ -245,6 +256,7 @@ func (nv *NarrativeValidator) ValidateNarrative(narrative string, rollOutcome st
 	enabled := nv.enabled
 	useRuleValidation := nv.useRuleValidation
 	useConsistencyCheck := nv.useConsistencyCheck
+	useLogicCheck := nv.useLogicCheck
 	useAutoCorrection := nv.useAutoCorrection
 	nv.configMutex.RUnlock()
 
@@ -265,6 +277,9 @@ func (nv *NarrativeValidator) ValidateNarrative(narrative string, rollOutcome st
 	}
 	if useConsistencyCheck && rollOutcome != "" {
 		tasks = append(tasks, "consistency")
+	}
+	if useLogicCheck {
+		tasks = append(tasks, "logic")
 	}
 
 	if len(tasks) == 0 {
@@ -371,6 +386,22 @@ func (nv *NarrativeValidator) buildValidationPrompt(narrative string, rollOutcom
 			sb.WriteString("- 叙事的整体基调应该与判定结果匹配\n")
 			sb.WriteString("\n")
 		}
+		if task == "logic" {
+			sb.WriteString("【逻辑一致性校验】\n")
+			sb.WriteString("检查叙事内部是否存在逻辑矛盾或前后不一致：\n")
+			sb.WriteString("1. 角色言行一致性：\n")
+			sb.WriteString("   - 角色说的话与做的事是否矛盾（如：说要帮助却做出伤害行为）\n")
+			sb.WriteString("   - 角色的态度是否前后一致（如：先友善后突然敌对，无合理转折）\n")
+			sb.WriteString("2. 物品/能力效果一致性：\n")
+			sb.WriteString("   - 同一物品/能力的效果描述是否自相矛盾\n")
+			sb.WriteString("   - 例如：药物不能同时\"治愈伤势\"又\"加重病情\"\n")
+			sb.WriteString("3. 因果逻辑一致性：\n")
+			sb.WriteString("   - 事件的因果关系是否合理\n")
+			sb.WriteString("   - 结果是否与前文描述的行动相符\n")
+			sb.WriteString("4. 数值/状态一致性：\n")
+			sb.WriteString("   - 描述的数值变化是否合理（如：受伤后不能说\"毫发无损\"）\n")
+			sb.WriteString("\n")
+		}
 	}
 
 	sb.WriteString("【输出要求】\n")
@@ -394,7 +425,8 @@ func (nv *NarrativeValidator) buildValidationPrompt(narrative string, rollOutcom
 		sb.WriteString("1. 保持原有的文风和世界观\n")
 		sb.WriteString("2. 移除或替换禁止出现的内容\n")
 		sb.WriteString("3. 确保叙事与判定结果一致\n")
-		sb.WriteString("4. 尽量保留原叙事的精彩部分\n")
+		sb.WriteString("4. 修正逻辑矛盾，确保叙事内部自洽\n")
+		sb.WriteString("5. 尽量保留原叙事的精彩部分\n")
 	}
 
 	sb.WriteString("\n只输出JSON，不要输出其他内容。")

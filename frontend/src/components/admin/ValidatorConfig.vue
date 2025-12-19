@@ -32,6 +32,12 @@
           <span class="form-tip">使用AI检测叙事与判定结果是否一致</span>
         </el-form-item>
 
+        <!-- 逻辑一致性校验 -->
+        <el-form-item label="逻辑一致性校验">
+          <el-switch v-model="config.use_logic_check" :disabled="!config.enabled" />
+          <span class="form-tip">使用AI检测叙事内部逻辑是否自洽（如角色言行矛盾、物品效果冲突等）</span>
+        </el-form-item>
+
         <!-- 自动修正 -->
         <el-form-item label="自动修正">
           <el-switch v-model="config.use_auto_correction" :disabled="!config.enabled" />
@@ -88,6 +94,7 @@
             <div class="alert-content">
               <p><strong>规则校验：</strong>检测叙事中是否包含禁止出现的内容（如轮回转生、机缘次数等已移除的游戏概念）</p>
               <p><strong>一致性校验：</strong>检测AI生成的叙事是否与骰子判定结果一致（如判定失败但叙事描述成功）</p>
+              <p><strong>逻辑一致性校验：</strong>检测叙事内部是否存在逻辑矛盾（如角色说要帮助却做出伤害行为、药物同时治愈又加重病情等）</p>
               <p><strong>自动修正：</strong>当发现问题时，使用AI自动修正叙事内容，保持原有文风</p>
               <p><strong>注意：</strong>每次校验都会调用AI接口，会产生额外的API费用</p>
             </div>
@@ -109,6 +116,7 @@ interface ValidatorConfig {
   enabled: boolean
   use_rule_validation: boolean
   use_consistency_check: boolean
+  use_logic_check: boolean
   use_auto_correction: boolean
   validator_model_id: string
 }
@@ -139,6 +147,7 @@ const config = reactive<ValidatorConfig>({
   enabled: true,
   use_rule_validation: true,
   use_consistency_check: true,
+  use_logic_check: true,
   use_auto_correction: true,
   validator_model_id: ''
 })
