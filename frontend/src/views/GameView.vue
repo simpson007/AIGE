@@ -174,6 +174,7 @@
               </div>
               
               <button
+                v-if="authStore.isAdmin()"
                 @click="toggleSoulBurnMode"
                 :class="['btn-soul-burn', { active: soulBurnMode }]"
                 :title="soulBurnMode ? '关闭燃魂' : '开启燃魂'"

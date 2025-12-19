@@ -710,7 +710,8 @@ func (gc *GameController) executeRoll(rollRequest map[string]interface{}, mod *G
 		forceSuccess = true
 		// 清除标志，只作用于本次判定
 		delete(session.State, "force_success")
-		delete(session.State, "cheat_mode") // 同时清除作弊模式标志
+		delete(session.State, "cheat_mode")      // 同时清除作弊模式标志
+		delete(session.State, "soul_burn_mode")  // 同时清除燃魂爆运模式标志
 		fmt.Printf("[作弊模式] 强制成功标志已激活，本次判定将返回大成功！\n")
 	}
 
@@ -1086,11 +1087,19 @@ func (gc *GameController) ProcessActionStreamWithAttributes(playerID, modID, act
 	if err != nil {
 		fmt.Printf("[一阶段重试] 所有重试均失败，最后错误: %v\n", lastErr)
 		session.State["is_processing"] = false
+		// 清除临时模式标志
+		delete(session.State, "force_success")
+		delete(session.State, "cheat_mode")
+		delete(session.State, "soul_burn_mode")
 		gc.stateManager.SaveSession(session)
 		return fmt.Errorf("first stage AI call failed after %d attempts: %w", maxRetries, lastErr)
 	}
 
 	session.State["is_processing"] = false
+	// 清除临时模式标志（确保每次动作后都清除）
+	delete(session.State, "force_success")
+	delete(session.State, "cheat_mode")
+	delete(session.State, "soul_burn_mode")
 	gc.stateManager.SaveSession(session)
 
 	return err
@@ -1198,11 +1207,19 @@ func (gc *GameController) ProcessActionStream(playerID, modID, action string, st
 	if err != nil {
 		fmt.Printf("[一阶段重试] 所有重试均失败，最后错误: %v\n", lastErr)
 		session.State["is_processing"] = false
+		// 清除临时模式标志
+		delete(session.State, "force_success")
+		delete(session.State, "cheat_mode")
+		delete(session.State, "soul_burn_mode")
 		gc.stateManager.SaveSession(session)
 		return fmt.Errorf("first stage AI call failed after %d attempts: %w", maxRetries, lastErr)
 	}
 
 	session.State["is_processing"] = false
+	// 清除临时模式标志（确保每次动作后都清除）
+	delete(session.State, "force_success")
+	delete(session.State, "cheat_mode")
+	delete(session.State, "soul_burn_mode")
 	gc.stateManager.SaveSession(session)
 
 	return err
