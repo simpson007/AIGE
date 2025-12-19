@@ -125,28 +125,11 @@ func (sm *StateManager) GetSession(playerID, modID string) (*GameSession, error)
 	return session, nil
 }
 
-// checkAndResetDaily 检查并执行每日重置
+// checkAndResetDaily 检查并执行每日重置（已禁用）
+// 游戏不再按日重置，玩家可以持续进行游戏
 func (sm *StateManager) checkAndResetDaily(session *GameSession) {
-	today := time.Now().Format("2006-01-02")
-
-	// 如果session_date与今天不同，说明是新的一天
-	if session.SessionDate != today {
-		fmt.Printf("[StateManager] 检测到新的一天，更新玩家 %s 的日期\n", session.PlayerID)
-
-		// 移除机缘限制，只重置必要的游戏状态
-		if session.State != nil {
-			// 不再重置 opportunities_remaining，让游戏可以无限进行
-			// session.State["opportunities_remaining"] = 10  // 已移除
-			session.State["daily_success_achieved"] = false
-			session.State["is_in_trial"] = false
-			session.State["is_processing"] = false
-			session.State["current_life"] = nil
-		}
-
-		// 更新日期
-		session.SessionDate = today
-		session.LastModified = time.Now()
-	}
+	// 每日重置功能已移除，游戏状态将持续保留
+	// 如需重置游戏，玩家可手动使用"重启机缘"功能
 }
 
 // GetPlayerSessions retrieves all sessions for a player
