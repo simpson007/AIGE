@@ -16,10 +16,11 @@ import (
 
 // GameController handles game logic and AI interactions
 type GameController struct {
-	modLoader          *ModLoader
-	stateManager       *StateManager
-	aiClient           *services.AIClient
-	compressionManager *CompressionManager
+	modLoader           *ModLoader
+	stateManager        *StateManager
+	aiClient            *services.AIClient
+	compressionManager  *CompressionManager
+	narrativeValidator  *NarrativeValidator // 叙事校验器
 	// AI配置内存缓存
 	gameProviders      map[string]AIProvider // modID -> AIProvider
 	defaultProvider    AIProvider
@@ -38,13 +39,15 @@ type AIProvider struct {
 func NewGameController(modLoader *ModLoader, stateManager *StateManager) *GameController {
 	aiClient := services.NewAIClient()
 	compressionManager := NewCompressionManager(aiClient, stateManager)
+	narrativeValidator := NewNarrativeValidator(aiClient)
 	
 	gc := &GameController{
-		modLoader:          modLoader,
-		stateManager:       stateManager,
-		aiClient:           aiClient,
-		compressionManager: compressionManager,
-		gameProviders:      make(map[string]AIProvider),
+		modLoader:           modLoader,
+		stateManager:        stateManager,
+		aiClient:            aiClient,
+		compressionManager:  compressionManager,
+		narrativeValidator:  narrativeValidator,
+		gameProviders:       make(map[string]AIProvider),
 		// 默认配置，应该从数据库或环境变量加载
 		defaultProvider: AIProvider{
 			APIType: "openai",
@@ -60,12 +63,20 @@ func NewGameController(modLoader *ModLoader, stateManager *StateManager) *GameCo
 	// 设置压缩管理器的GameController引用
 	compressionManager.SetGameController(gc)
 	
+	// 设置叙事校验器的GameController引用
+	narrativeValidator.SetGameController(gc)
+	
 	return gc
 }
 
 // SetAIProvider 设置AI提供商配置
 func (gc *GameController) SetAIProvider(provider AIProvider) {
 	gc.defaultProvider = provider
+}
+
+// GetNarrativeValidator 获取叙事校验器
+func (gc *GameController) GetNarrativeValidator() *NarrativeValidator {
+	return gc.narrativeValidator
 }
 
 // LoadAllGameModelConfigs 从数据库加载所有游戏模型配置到内存
@@ -1046,48 +1057,47 @@ func (gc *GameController) ProcessActionStreamWithAttributes(playerID, modID, act
 	var lastErr error
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		fmt.Printf("[一阶段重试] 尝试第 %d/%d 次调用AI\n", attempt, maxRetries)
+		fmt.Printf("[一阶段重试-WithAttr] 尝试第 %d/%d 次调用AI\n", attempt, maxRetries)
 
 		err = gc.callAIStream(session, prompt, mod, action, streamCallback, rollCallback, secondStageCallback)
 		if err == nil {
-			fmt.Printf("[一阶段重试] 第 %d 次调用成功\n", attempt)
+			fmt.Printf("[一阶段重试-WithAttr] 第 %d 次调用成功\n", attempt)
 			break
 		}
 
 		lastErr = err
-		fmt.Printf("[一阶段重试] 第 %d 次调用失败: %v\n", attempt, err)
+		fmt.Printf("[一阶段重试-WithAttr] 第 %d 次调用失败: %v\n", attempt, err)
 
-		// 检查是否是JSON格式错误
+		// 二阶段错误不应该触发一阶段重试
+		if strings.Contains(err.Error(), "second stage") {
+			fmt.Printf("[一阶段重试-WithAttr] 二阶段错误，不重试一阶段（二阶段已有备用方案）\n")
+			err = nil // 清除错误
+			break
+		}
+
+		// 检查是否是一阶段的JSON格式错误
 		if strings.Contains(err.Error(), "no valid JSON found") ||
 			strings.Contains(err.Error(), "failed to parse") {
-			fmt.Printf("[一阶段重试] 检测到JSON格式错误，准备重试...\n")
+			fmt.Printf("[一阶段重试-WithAttr] 检测到JSON格式错误，准备重试...\n")
 
 			if attempt < maxRetries {
-				// 在重试前稍等一下，避免请求过于频繁
-				// time.Sleep(time.Millisecond * 500)
-
-				// 修改prompt，要求AI更加注意格式
 				if action == "start_new_trial" {
-					// 新游戏开始，使用特殊提示
 					currentStateJSON, _ := json.Marshal(session.State)
 					prompt = fmt.Sprintf("%s\n\n⚠️ 重要格式要求：\n1. 必须严格按照JSON格式输出\n2. 确保JSON语法正确，特别注意引号和逗号\n3. 所有字符串值都要用双引号包围\n4. 叙事内容在JSON的narrative字段中\n\n当前游戏状态：\n%s", mod.Prompts["start_game"], string(currentStateJSON))
 				} else {
-					// 常规动作，添加格式提醒
 					currentStateJSON, _ := json.Marshal(session.State)
 					prompt = fmt.Sprintf("%s\n\n⚠️ 重要格式要求：\n1. 必须严格按照JSON格式输出\n2. 确保JSON语法正确，特别注意引号和逗号\n3. 所有字符串值都要用双引号包围\n4. 叙事内容在JSON的narrative字段中\n\n当前游戏状态：\n%s", action, string(currentStateJSON))
 				}
 			}
 		} else {
-			// 非格式错误，不重试
-			fmt.Printf("[一阶段重试] 非格式错误，不进行重试: %v\n", err)
+			fmt.Printf("[一阶段重试-WithAttr] 其他错误，不进行重试: %v\n", err)
 			break
 		}
 	}
 
 	if err != nil {
-		fmt.Printf("[一阶段重试] 所有重试均失败，最后错误: %v\n", lastErr)
+		fmt.Printf("[一阶段重试-WithAttr] 所有重试均失败，最后错误: %v\n", lastErr)
 		session.State["is_processing"] = false
-		// 清除临时模式标志
 		delete(session.State, "force_success")
 		delete(session.State, "cheat_mode")
 		delete(session.State, "soul_burn_mode")
@@ -1096,7 +1106,6 @@ func (gc *GameController) ProcessActionStreamWithAttributes(playerID, modID, act
 	}
 
 	session.State["is_processing"] = false
-	// 清除临时模式标志（确保每次动作后都清除）
 	delete(session.State, "force_success")
 	delete(session.State, "cheat_mode")
 	delete(session.State, "soul_burn_mode")
@@ -1166,48 +1175,47 @@ func (gc *GameController) ProcessActionStream(playerID, modID, action string, st
 	var lastErr error
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		fmt.Printf("[一阶段重试] 尝试第 %d/%d 次调用AI\n", attempt, maxRetries)
+		fmt.Printf("[一阶段重试-Stream] 尝试第 %d/%d 次调用AI\n", attempt, maxRetries)
 
 		err = gc.callAIStream(session, prompt, mod, action, streamCallback, rollCallback, secondStageCallback)
 		if err == nil {
-			fmt.Printf("[一阶段重试] 第 %d 次调用成功\n", attempt)
+			fmt.Printf("[一阶段重试-Stream] 第 %d 次调用成功\n", attempt)
 			break
 		}
 
 		lastErr = err
-		fmt.Printf("[一阶段重试] 第 %d 次调用失败: %v\n", attempt, err)
+		fmt.Printf("[一阶段重试-Stream] 第 %d 次调用失败: %v\n", attempt, err)
 
-		// 检查是否是JSON格式错误
+		// 二阶段错误不应该触发一阶段重试
+		if strings.Contains(err.Error(), "second stage") {
+			fmt.Printf("[一阶段重试-Stream] 二阶段错误，不重试一阶段（二阶段已有备用方案）\n")
+			err = nil // 清除错误
+			break
+		}
+
+		// 检查是否是一阶段的JSON格式错误
 		if strings.Contains(err.Error(), "no valid JSON found") ||
 			strings.Contains(err.Error(), "failed to parse") {
-			fmt.Printf("[一阶段重试] 检测到JSON格式错误，准备重试...\n")
+			fmt.Printf("[一阶段重试-Stream] 检测到JSON格式错误，准备重试...\n")
 
 			if attempt < maxRetries {
-				// 在重试前稍等一下，避免请求过于频繁
-				// time.Sleep(time.Millisecond * 500)
-
-				// 修改prompt，要求AI更加注意格式
 				if action == "start_new_trial" {
-					// 新游戏开始，使用特殊提示
 					currentStateJSON, _ := json.Marshal(session.State)
 					prompt = fmt.Sprintf("%s\n\n⚠️ 重要格式要求：\n1. 必须严格按照JSON格式输出\n2. 确保JSON语法正确，特别注意引号和逗号\n3. 所有字符串值都要用双引号包围\n4. 叙事内容在JSON的narrative字段中\n\n当前游戏状态：\n%s", mod.Prompts["start_game"], string(currentStateJSON))
 				} else {
-					// 常规动作，添加格式提醒
 					currentStateJSON, _ := json.Marshal(session.State)
 					prompt = fmt.Sprintf("%s\n\n⚠️ 重要格式要求：\n1. 必须严格按照JSON格式输出\n2. 确保JSON语法正确，特别注意引号和逗号\n3. 所有字符串值都要用双引号包围\n4. 叙事内容在JSON的narrative字段中\n\n当前游戏状态：\n%s", action, string(currentStateJSON))
 				}
 			}
 		} else {
-			// 非格式错误，不重试
-			fmt.Printf("[一阶段重试] 非格式错误，不进行重试: %v\n", err)
+			fmt.Printf("[一阶段重试-Stream] 其他错误，不进行重试: %v\n", err)
 			break
 		}
 	}
 
 	if err != nil {
-		fmt.Printf("[一阶段重试] 所有重试均失败，最后错误: %v\n", lastErr)
+		fmt.Printf("[一阶段重试-Stream] 所有重试均失败，最后错误: %v\n", lastErr)
 		session.State["is_processing"] = false
-		// 清除临时模式标志
 		delete(session.State, "force_success")
 		delete(session.State, "cheat_mode")
 		delete(session.State, "soul_burn_mode")
@@ -1216,7 +1224,6 @@ func (gc *GameController) ProcessActionStream(playerID, modID, action string, st
 	}
 
 	session.State["is_processing"] = false
-	// 清除临时模式标志（确保每次动作后都清除）
 	delete(session.State, "force_success")
 	delete(session.State, "cheat_mode")
 	delete(session.State, "soul_burn_mode")
@@ -1379,6 +1386,34 @@ func (gc *GameController) callAIStream(session *GameSession, prompt string, mod 
 		return fmt.Errorf("failed to parse AI response JSON: %w", err)
 	}
 
+	// 【叙事校验】使用AI验证器校验并修正叙事内容
+	if gc.narrativeValidator != nil {
+		// 提取叙事内容
+		narrativeFromFormat := extractNarrative(aiResponse)
+		narrative := narrativeFromFormat
+		if narrative == "" {
+			narrative, _ = parsed["narrative"].(string)
+		}
+
+		// 校验叙事（一阶段没有判定结果，传空字符串）
+		validationResult := gc.narrativeValidator.ValidateNarrative(narrative, "", mod.Config.GameID)
+		if !validationResult.IsValid {
+			fmt.Printf("[叙事校验] 一阶段发现问题: %v\n", validationResult.Violations)
+			// 优先使用AI修正后的内容
+			if validationResult.CorrectedText != "" {
+				parsed["narrative"] = validationResult.CorrectedText
+				fmt.Printf("[叙事校验] 已应用AI修正\n")
+			} else if narrative != "" {
+				// 备用：使用快速过滤替换禁止词汇
+				filteredNarrative := gc.narrativeValidator.QuickFilter(narrative)
+				if filteredNarrative != narrative {
+					parsed["narrative"] = filteredNarrative
+					fmt.Printf("[叙事校验] 已应用快速过滤修正\n")
+				}
+			}
+		}
+	}
+
 	// Add to history and handle compression
 	aiMsg := Message{
 		Role:      "assistant",
@@ -1472,7 +1507,26 @@ func (gc *GameController) callAIStream(session *GameSession, prompt string, mod 
 
 		if err != nil {
 			fmt.Printf("[二阶段重试] 所有重试均失败，最后错误: %v\n", lastErr)
-			return fmt.Errorf("second stage AI call failed after %d attempts: %w", maxRetries, lastErr)
+			// 二阶段失败时，不要返回错误让一阶段重试
+			// 而是应用一阶段的状态更新，并记录错误
+			fmt.Printf("[二阶段重试] 二阶段失败，将保留一阶段结果，判定结果为: %s\n", rollResult["outcome"])
+			
+			// 根据判定结果生成一个简单的失败/成功提示
+			outcomeStr := rollResult["outcome"].(string)
+			var fallbackNarrative string
+			if outcomeStr == "失败" || outcomeStr == "大失败" {
+				fallbackNarrative = fmt.Sprintf("【判定结果：%s】\n\n你的尝试未能成功，命运的天平并未向你倾斜。", outcomeStr)
+			} else {
+				fallbackNarrative = fmt.Sprintf("【判定结果：%s】\n\n你的努力得到了回报，命运眷顾了你。", outcomeStr)
+			}
+			
+			// 通过回调发送备用叙事
+			if secondStageCallback != nil {
+				secondStageCallback(fallbackNarrative)
+			}
+			
+			// 不返回错误，让流程继续
+			// return fmt.Errorf("second stage AI call failed after %d attempts: %w", maxRetries, lastErr)
 		}
 
 	} else {
@@ -1706,6 +1760,46 @@ func (gc *GameController) callAIStreamSecondStage(session *GameSession, prompt s
 		fmt.Printf("DEBUG: Failed to parse second JSON. Extracted JSON: %s\n", jsonStr)
 		fmt.Printf("DEBUG: Full second AI response: %s\n", aiResponse)
 		return fmt.Errorf("failed to parse second AI response JSON: %w", err)
+	}
+
+	// 【叙事校验】使用AI验证器校验并修正二阶段叙事内容
+	// 二阶段有判定结果，需要校验叙事与判定结果的一致性
+	if gc.narrativeValidator != nil {
+		// 提取叙事内容
+		narrativeFromFormat := extractNarrative(aiResponse)
+		narrative := narrativeFromFormat
+		if narrative == "" {
+			narrative, _ = parsed["narrative"].(string)
+		}
+
+		// 从 prompt 中提取判定结果（格式：判定已完成：XXX）
+		rollOutcome := ""
+		if strings.Contains(prompt, "判定已完成：") {
+			startIdx := strings.Index(prompt, "判定已完成：") + len("判定已完成：")
+			endIdx := strings.Index(prompt[startIdx:], "\n")
+			if endIdx > 0 {
+				rollOutcome = strings.TrimSpace(prompt[startIdx : startIdx+endIdx])
+			}
+		}
+
+		// 校验叙事与判定结果的一致性（使用AI校验）
+		validationResult := gc.narrativeValidator.ValidateNarrative(narrative, rollOutcome, mod.Config.GameID)
+		if !validationResult.IsValid {
+			fmt.Printf("[叙事校验] 二阶段发现问题: %v\n", validationResult.Violations)
+			
+			// 优先使用AI修正后的内容
+			if validationResult.CorrectedText != "" {
+				parsed["narrative"] = validationResult.CorrectedText
+				fmt.Printf("[叙事校验] 已应用AI修正后的叙事\n")
+			} else if narrative != "" {
+				// 备用：使用快速过滤替换禁止词汇
+				filteredNarrative := gc.narrativeValidator.QuickFilter(narrative)
+				if filteredNarrative != narrative {
+					parsed["narrative"] = filteredNarrative
+					fmt.Printf("[叙事校验] 已应用快速过滤修正\n")
+				}
+			}
+		}
 	}
 
 	// Add to history and handle compression

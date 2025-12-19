@@ -54,6 +54,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SystemSettings: typeof import('./src/components/admin/SystemSettings.vue')['default']
     UserManagement: typeof import('./src/components/admin/UserManagement.vue')['default']
+    ValidatorConfig: typeof import('./src/components/admin/ValidatorConfig.vue')['default']
     WelcomePage: typeof import('./src/components/admin/WelcomePage.vue')['default']
   }
   export interface ComponentCustomProperties {

@@ -526,6 +526,95 @@ func SaveGameModelConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "配置已保存"})
 }
 
+// GetValidatorConfig 获取叙事校验器配置（管理员接口）
+func GetValidatorConfig(c *gin.Context) {
+	InitGameEngine()
+
+	if gameController == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "游戏引擎未初始化"})
+		return
+	}
+
+	validator := gameController.GetNarrativeValidator()
+	if validator == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "校验器未初始化"})
+		return
+	}
+
+	cfg := validator.GetConfig()
+	c.JSON(http.StatusOK, cfg)
+}
+
+// SaveValidatorConfig 保存叙事校验器配置（管理员接口）
+func SaveValidatorConfig(c *gin.Context) {
+	InitGameEngine()
+
+	var req game_engine.ValidatorConfig
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求参数"})
+		return
+	}
+
+	if gameController == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "游戏引擎未初始化"})
+		return
+	}
+
+	validator := gameController.GetNarrativeValidator()
+	if validator == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "校验器未初始化"})
+		return
+	}
+
+	// 更新校验器配置
+	validator.UpdateConfig(req)
+
+	// 同时保存到数据库
+	// 保存启用状态
+	saveSystemConfigToDB("validator_enabled", boolToString(req.Enabled))
+	// 保存规则校验开关
+	saveSystemConfigToDB("validator_rule_check", boolToString(req.UseRuleValidation))
+	// 保存一致性校验开关
+	saveSystemConfigToDB("validator_consistency_check", boolToString(req.UseConsistencyCheck))
+	// 保存自动修正开关
+	saveSystemConfigToDB("validator_auto_correction", boolToString(req.UseAutoCorrection))
+	// 保存校验模型ID
+	saveSystemConfigToDB("validator_model_id", req.ValidatorModelID)
+
+	fmt.Printf("[SaveValidatorConfig] 校验器配置已保存 - 启用: %v, 规则校验: %v, 一致性校验: %v, 自动修正: %v, 模型ID: %s\n",
+		req.Enabled, req.UseRuleValidation, req.UseConsistencyCheck, req.UseAutoCorrection, req.ValidatorModelID)
+
+	c.JSON(http.StatusOK, gin.H{"message": "校验器配置已保存"})
+}
+
+// boolToString 布尔值转字符串
+func boolToString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+// saveSystemConfigToDB 保存系统配置到数据库
+func saveSystemConfigToDB(key string, value string) {
+	db := config.DB
+	var conf models.SystemConfig
+	result := db.Where("key = ?", key).First(&conf)
+
+	if result.Error != nil {
+		// 不存在，创建新配置
+		conf = models.SystemConfig{
+			Key:   key,
+			Value: value,
+		}
+		db.Create(&conf)
+	} else {
+		// 存在，更新配置
+		conf.Value = value
+		db.Save(&conf)
+	}
+}
+
 // RestartOpportunities 重启机缘（清空指定MOD存档，重置机缘次数）
 func RestartOpportunities(c *gin.Context) {
 	userID := c.GetUint("user_id") // 修复：使用正确的键名

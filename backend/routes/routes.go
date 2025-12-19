@@ -86,6 +86,10 @@ func SetupRoutes(r *gin.Engine) {
 		admin.POST("/game/reload-config", controllers.ReloadGameConfig)
 		admin.GET("/game/model-config", controllers.GetGameModelConfig)
 		admin.POST("/game/model-config", controllers.SaveGameModelConfig)
+		
+		// 叙事校验器配置
+		admin.GET("/game/validator-config", controllers.GetValidatorConfig)
+		admin.POST("/game/validator-config", controllers.SaveValidatorConfig)
 
 		// OAuth 配置管理
 		admin.GET("/oauth/config", controllers.GetOAuthConfig)

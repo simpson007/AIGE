@@ -40,6 +40,11 @@
             <el-icon><Key /></el-icon>
             <span>OAuth配置</span>
           </el-menu-item>
+
+          <el-menu-item index="validator">
+            <el-icon><Checked /></el-icon>
+            <span>叙事校验器</span>
+          </el-menu-item>
           
           <el-menu-item index="system">
             <el-icon><Setting /></el-icon>
@@ -388,6 +393,11 @@
             </el-card>
           </div>
 
+          <!-- 叙事校验器配置页面 -->
+          <div v-if="activeMenu === 'validator'">
+            <ValidatorConfig />
+          </div>
+
           <!-- 系统设置页面 -->
           <div v-if="activeMenu === 'system'">
             <el-card>
@@ -464,6 +474,11 @@
           <el-menu-item index="oauth">
             <el-icon><Key /></el-icon>
             <span>OAuth配置</span>
+          </el-menu-item>
+
+          <el-menu-item index="validator">
+            <el-icon><Checked /></el-icon>
+            <span>叙事校验器</span>
           </el-menu-item>
           
           <el-menu-item index="system">
@@ -586,11 +601,13 @@ import {
   Check,
   ChatLineSquare,
   Plus,
-  Edit
+  Edit,
+  Checked
 } from '@element-plus/icons-vue'
 import ProviderManagement from '@/components/admin/ProviderManagement.vue'
 import Playground from '@/components/admin/Playground.vue'
 import ChatManagement from '@/components/admin/ChatManagement.vue'
+import ValidatorConfig from '@/components/admin/ValidatorConfig.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -743,6 +760,7 @@ const getCurrentPageTitle = () => {
     providers: '提供商管理',
     playground: '操练场',
     oauth: 'OAuth配置',
+    validator: '叙事校验器',
     system: '系统设置'
   }
   return titles[activeMenu.value] || '概览'
