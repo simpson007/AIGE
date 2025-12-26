@@ -674,6 +674,18 @@ function handleWebSocketMessage(message: any) {
   isLoading.value = false
   switch (message.type) {
     case 'narrative_chunk':
+        // 🔴 检测清除信号 - 用于重试时清除之前的流式内容
+        if (message.data.content === '__CLEAR_NARRATIVE__') {
+            console.log('[GameView] 收到清除信号，清除之前的流式内容')
+            streamingNarrative.value = ''
+            // 如果正在流式中，移除 display_history 中的最后一条消息
+            if (isStreaming.value && gameState.value?.display_history && gameState.value.display_history.length > 0) {
+                gameState.value.display_history = gameState.value.display_history.slice(0, -1)
+            }
+            isStreaming.value = false
+            break
+        }
+        
         if (!isStreaming.value) {
             isStreaming.value = true
             streamingNarrative.value = ''

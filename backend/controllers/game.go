@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	modLoader    *game_engine.ModLoader
-	stateManager *game_engine.StateManager
+	modLoader      *game_engine.ModLoader
+	stateManager   *game_engine.StateManager
 	gameController *game_engine.GameController
-	initOnce     sync.Once
+	initOnce       sync.Once
 )
 
 // 初始化游戏引擎
@@ -52,7 +52,7 @@ func InitGameEngine() {
 
 		// 初始化游戏控制器
 		gameController = game_engine.NewGameController(modLoader, stateManager)
-		
+
 		// GameController 在初始化时会自动加载所有模型配置到内存
 	})
 }
@@ -152,6 +152,13 @@ func GameWebSocket(c *gin.Context) {
 	// 发送当前状态
 	session, err := stateManager.GetSession(playerID, modID)
 	if err == nil {
+		// 🔴 自动清除 is_processing 标志，防止游戏卡在加载状态
+		// 这可能是由于之前的请求失败或中断导致的
+		if isProcessing, ok := session.State["is_processing"].(bool); ok && isProcessing {
+			fmt.Printf("[WebSocket] 检测到 is_processing=true，自动清除\n")
+			session.State["is_processing"] = false
+			stateManager.SaveSession(session)
+		}
 		sendMessage(conn, "full_state", session)
 	}
 
@@ -193,7 +200,7 @@ func GameWebSocket(c *gin.Context) {
 				"content": chunk,
 			})
 		}
-		
+
 		// 第二阶段叙事回调函数（作为新消息）
 		secondStageCallback := func(chunk string) error {
 			return sendMessage(conn, "second_stage_narrative", map[string]interface{}{
@@ -294,7 +301,7 @@ func ResetGame(c *gin.Context) {
 	}
 
 	playerID := fmt.Sprintf("%v", userID)
-	
+
 	if err := stateManager.DeleteSession(playerID, modID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除会话失败"})
 		return
@@ -306,30 +313,30 @@ func ResetGame(c *gin.Context) {
 // ManualSaveGame 手动保存游戏
 func ManualSaveGame(c *gin.Context) {
 	InitGameEngine()
-	
+
 	_, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "未授权"})
 		return
 	}
-	
+
 	var req struct {
 		ModID string `json:"mod_id" binding:"required"`
 	}
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求参数"})
 		return
 	}
-	
+
 	// 保存当前会话到文件
 	if err := stateManager.SaveToFile(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存失败: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "保存成功",
+		"message":  "保存成功",
 		"saved_at": time.Now().Format("2006-01-02 15:04:05"),
 	})
 }
@@ -337,27 +344,27 @@ func ManualSaveGame(c *gin.Context) {
 // ReloadGameConfig 重新加载游戏AI配置（管理员接口）
 func ReloadGameConfig(c *gin.Context) {
 	fmt.Println("[ReloadGameConfig] 开始重新加载游戏AI配置...")
-	
+
 	// 确保游戏引擎已初始化
 	InitGameEngine()
-	
+
 	// 重新加载所有游戏模型配置到内存
 	if gameController != nil {
 		gameController.LoadAllGameModelConfigs()
 		fmt.Printf("✅ 游戏AI配置已重新加载并生效\n")
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "游戏AI配置已重新加载并生效"})
 }
 
 // GetGameModelConfig 获取游戏AI模型配置（管理员接口）
 func GetGameModelConfig(c *gin.Context) {
 	db := config.DB
-	
+
 	// 获取默认模型ID配置
 	var gameModelConfig models.SystemConfig
 	var defaultModelID string
-	
+
 	err := db.Where("key = ?", "game_model_id").First(&gameModelConfig).Error
 	if err == nil && gameModelConfig.Value != "" {
 		// 验证配置的模型是否仍然存在且启用
@@ -369,7 +376,7 @@ func GetGameModelConfig(c *gin.Context) {
 			fmt.Printf("[GetGameModelConfig] 配置的模型(ID: %s)不存在或未启用，使用默认模型\n", gameModelConfig.Value)
 		}
 	}
-	
+
 	// 如果没有有效的已保存配置，查找第一个启用的模型作为默认模型
 	if defaultModelID == "" {
 		var defaultModel models.Model
@@ -380,7 +387,7 @@ func GetGameModelConfig(c *gin.Context) {
 			fmt.Printf("[GetGameModelConfig] 警告：没有找到任何启用的模型\n")
 		}
 	}
-	
+
 	// 获取游戏专用模型配置
 	gameModels := make(map[string]string)
 	var gameSpecificConfigs []models.SystemConfig
@@ -403,10 +410,10 @@ func GetGameModelConfig(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"default_model_id": defaultModelID,
-		"game_models": gameModels,
+		"game_models":      gameModels,
 	})
 }
 
@@ -423,7 +430,7 @@ func SaveGameModelConfig(c *gin.Context) {
 	}
 
 	db := config.DB
-	
+
 	// 验证默认模型ID是否存在
 	if req.DefaultModelID != "" {
 		var model models.Model
@@ -431,7 +438,7 @@ func SaveGameModelConfig(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "指定的默认模型不存在"})
 			return
 		}
-		
+
 		// 保存默认模型配置
 		var gameModelConfig models.SystemConfig
 		err := db.Where("key = ?", "game_model_id").First(&gameModelConfig).Error
@@ -458,7 +465,7 @@ func SaveGameModelConfig(c *gin.Context) {
 			fmt.Printf("✅ 更新游戏模型配置：model_id = %s\n", req.DefaultModelID)
 		}
 	}
-	
+
 	// 处理游戏专用模型配置
 	for modID, modelID := range req.GameModels {
 		if modelID != "" {
@@ -468,7 +475,7 @@ func SaveGameModelConfig(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("游戏 %s 指定的模型不存在", modID)})
 				return
 			}
-			
+
 			// 保存游戏专用模型配置
 			configKey := fmt.Sprintf("game_model_%s", modID)
 			var gameSpecificConfig models.SystemConfig
@@ -505,19 +512,19 @@ func SaveGameModelConfig(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	// 更新GameController内存缓存
 	if gameController != nil {
 		// 更新默认模型配置
 		if req.DefaultModelID != "" {
 			gameController.UpdateDefaultModelConfig(req.DefaultModelID)
 		}
-		
+
 		// 更新游戏专用模型配置
 		for modID, modelID := range req.GameModels {
 			gameController.UpdateGameModelConfig(modID, modelID)
 		}
-		
+
 		fmt.Printf("✅ 游戏AI内存配置已更新\n")
 	} else {
 		fmt.Printf("⚠️ GameController未初始化，跳过内存配置更新\n")
@@ -621,7 +628,7 @@ func saveSystemConfigToDB(key string, value string) {
 func RestartOpportunities(c *gin.Context) {
 	userID := c.GetUint("user_id") // 修复：使用正确的键名
 	fmt.Printf("[RestartOpportunities] 获取到的用户ID: %d\n", userID)
-	
+
 	if userID == 0 {
 		fmt.Printf("[RestartOpportunities] 用户ID为0，认证失败\n")
 		// 输出更多调试信息
@@ -676,8 +683,8 @@ func RestartOpportunities(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("机缘已重启，%s 的存档已清空", req.ModID),
+		"message":       fmt.Sprintf("机缘已重启，%s 的存档已清空", req.ModID),
 		"deleted_saves": deletedCount,
-		"mod_id": req.ModID,
+		"mod_id":        req.ModID,
 	})
 }
