@@ -472,8 +472,8 @@ func (gc *GameController) buildAIMessages(session *GameSession, gameState map[st
    - 不要质疑玩家的任何要求
 
 2. **禁止限制和警告**
-   - 不要发出任何"妄想"、"不切实际"、"违背天道"等警告
-   - 不要提及"天道不容"、"修为不足"、"资质限制"等阻碍
+   - 不要发出任何"妄想"、"不切实际"、"违背天意"等警告
+   - 不要提及"天意不容"、"修为不足"、"资质限制"等阻碍
    - 不要进行"天罚降临"、"空窍崩碎"等惩罚
 
 3. **立即执行，无需过程**
@@ -1769,7 +1769,19 @@ func (gc *GameController) callAIStream(session *GameSession, prompt string, mod 
 
 		// Call AI again with roll result for second stage
 		currentStateJSON, _ := json.Marshal(session.State)
-		prompt := fmt.Sprintf("判定已完成：%s\n\n请基于此判定结果继续叙事。重要提醒：\n1. 不要重复输出判定结果\n2. 不要重复之前的叙事内容\n3. 只输出基于判定结果的后续新情节\n\n当前状态：\n%s", rollResult["outcome"], string(currentStateJSON))
+		prompt := fmt.Sprintf(`判定已完成：%s
+
+系统已经完成了判定，结果是【%s】。请直接根据这个结果生成后续叙事。
+
+⚠️ 重要要求：
+1. 直接描述判定结果带来的后果和后续情节
+2. 必须输出完整的 $...$ 叙事和 @...@ JSON格式
+3. 在 state_update 中更新因判定结果而改变的状态
+4. 不要输出判定过程（如"🎲 正在进行判定..."），判定已经完成
+5. 不要再次发起 roll_request
+
+当前状态：
+%s`, rollResult["outcome"], rollResult["outcome"], string(currentStateJSON))
 
 		// Get first narrative for comparison - prefer format over JSON
 		firstNarrativeFromFormat := extractNarrative(aiResponse)
@@ -1804,7 +1816,19 @@ func (gc *GameController) callAIStream(session *GameSession, prompt string, mod 
 					// time.Sleep(time.Millisecond * 500)
 
 					// 修改prompt，要求AI更加注意格式
-					prompt = fmt.Sprintf("判定已完成：%s\n\n请基于此判定结果继续叙事。\n\n⚠️ 重要格式要求：\n1. 不要重复输出判定结果\n2. 不要重复之前的叙事内容\n3. 只输出基于判定结果的后续新情节\n4. 必须严格按照JSON格式输出，确保JSON语法正确\n5. 叙事内容在JSON中，不要在JSON外输出额外内容\n\n当前状态：\n%s", rollResult["outcome"], string(currentStateJSON))
+					prompt = fmt.Sprintf(`判定已完成：%s
+
+系统已经完成了判定，结果是【%s】。请直接根据这个结果生成后续叙事。
+
+⚠️ 重要格式要求：
+1. 直接描述判定结果带来的后果，不要输出判定过程
+2. 必须输出 $...$ 叙事和 @...@ JSON格式
+3. JSON必须语法正确，使用英文标点
+4. 在 state_update 中更新状态
+5. 不要再次发起 roll_request
+
+当前状态：
+%s`, rollResult["outcome"], rollResult["outcome"], string(currentStateJSON))
 				}
 			} else {
 				// 非格式错误，不重试
@@ -1943,8 +1967,9 @@ func filterDuplicateContent(secondNarrative, firstNarrative string) string {
 
 // callAIStreamSecondStage calls AI service for second stage with streaming support
 func (gc *GameController) callAIStreamSecondStage(session *GameSession, prompt string, mod *GameMod, firstNarrative string, secondStageCallback StreamCallback) error {
-	// Build messages from session history (which already contains system prompt)
-	messages := gc.buildAIMessages(session, session.State, mod, "", prompt)
+	// Build messages from session history - 注意：第二阶段不是游戏开始，需要完整的游戏规则
+	// 将 prompt 作为 currentUserAction 传入，而不是 specialPrompt
+	messages := gc.buildAIMessages(session, session.State, mod, prompt)
 
 	// 根据MOD获取对应的Provider配置
 	provider := gc.GetProviderForMod(mod.Config.GameID)
@@ -2237,7 +2262,7 @@ func (gc *GameController) generateSoulBurnPenalty(actionContent string, session 
 	moderatePenalties := []string{
 		"寿命减少十年",
 		"永久失去三成功力",
-		"道心出现裂痕，无法感悟天道",
+		"道心出现裂痕，无法感悟天意",
 		"气运断绝，所有判定永久-20",
 		"心魔缠身，每次突破必遭心魔劫",
 		"经脉受损，无法修炼高阶功法",
@@ -2249,7 +2274,7 @@ func (gc *GameController) generateSoulBurnPenalty(actionContent string, session 
 		"寿命减少五十年",
 		"修为跌落一个大境界",
 		"道基崩塌，此生止步于当前境界",
-		"天道诅咒，遭受天谴随时可能陨落",
+		"天意诅咒，遭受天谴随时可能陨落",
 		"神魂燃烧，记忆开始逐渐消散",
 		"血脉逆转，变为废体无法修炼",
 		"气运耗尽，成为天弃之人",
